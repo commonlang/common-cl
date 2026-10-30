@@ -113,3 +113,22 @@ noted in small registries (`g_live`, `g_held`, `g_bufs`, `g_frames`) and
 `run_block` frees whatever is left above its mark when an error arrives. When
 you add a parse branch that holds a value across another parse or a `fail()`,
 wrap it in `held_push` / `held_pop`.
+
+## Releasing (maintainers)
+
+Each change adds a line under `## Unreleased` in `CHANGELOG.md`. To turn those
+into a version:
+
+```sh
+make release VERSION=0.4.1   # sets cl version, dates the changelog, runs every test
+git commit -am "Release 0.4.1"
+git tag v0.4.1
+git push && git push --tags
+```
+
+`make release` refuses a version that is not newer or an empty Unreleased
+section, and puts everything back if a test fails. It never commits or pushes.
+Use the next patch number for fixes (0.4.1), the next minor for new words or
+changed behavior (0.5.0). Then rebuild `cl` for your server: a binary does not
+update itself.
+
