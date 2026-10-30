@@ -489,6 +489,37 @@ big=$(python3 -I -c "print('x' * 6000)")
 pkill -f "cl serve $port"
 rm -rf $t
 
+# 3q. More hostile input, private files outside the web root, and wrong passwords
+t=$(mktemp -d)
+printf '<cl>show try form "code"</cl>' > $t/s.html
+./cl $t/s.html "" "code=set+5+to%0Aend" | grep -q 'expected a name'           || fail "set 5 to (a text block with a number for a name) is an error, not a crash"
+./cl $t/s.html "" "code=set+5+to+record%0Aend" | grep -q 'expected a name'    || fail "set 5 to record is an error, not a crash"
+deep=$(python3 -I -c "import urllib.parse; print(urllib.parse.quote_plus('show ' + 'count of '*20000 + '\"x\"'))")
+./cl $t/s.html "" "code=$deep" | grep -q 'nests too deeply'                  || fail "a long chain of count of is an error, not a crash"
+python3 -I -c "print('<cl>\n' + 'if yes\n'*20000 + 'show 1\n' + 'end\n'*20000 + '</cl>')" > $t/d.html
+./cl $t/d.html | grep -q 'nested too deeply'                                 || fail "20000 nested ifs are an error, not a crash"
+printf '<cl>\nto countdown n\n  if n is more than 0\n    countdown n - 1\n  end\nend\ncountdown 99\nshow "deep ok"\n</cl>\n' > $t/r.html
+./cl $t/r.html | grep -q '^deep ok'                                          || fail "a verb may still call itself 99 deep with an if inside"
+mkdir -p $t/home/public_html; d=$t/home/public_html
+printf '<cl>remember "a" as "b"\nshow "ok"</cl>' > $d/p.html
+SCRIPT_FILENAME=$d/p.html DOCUMENT_ROOT=$d ./cl cgi >/dev/null
+[ -f $t/home/.common/public_html/cl.secret ] && [ ! -f $d/cl.secret ]       || fail "cgi keeps cl.secret outside the web root"
+[ "$(ls -l $t/home/.common/public_html/cl.secret | cut -c1-10)" = "-rw-------" ] || fail "cl.secret is readable only by its owner"
+SCRIPT_FILENAME=$d/p.html DOCUMENT_ROOT=$d CL_PRIVATE_DIR=$t ./cl cgi >/dev/null
+[ -f $t/cl.secret ]                                                          || fail "CL_PRIVATE_DIR chooses the private folder"
+if [ -n "$has_db" ]; then
+  h=$(printf '<cl>show hash of "right"</cl>' > $t/h.html; ./cl $t/h.html)
+  sqlite3 $t/u.db "create table users (name text, password text); insert into users values ('ada', '$h')"
+  printf '<cl>\nopen database "u.db"\nset u to first of ask database "select password from users where name = ?" with "ada"\nif form "p" matches password of u\n  show "in"\notherwise\n  show "wrong"\nend\n</cl>\n' > $t/login.html
+  login() { printf "p=$1" | SCRIPT_FILENAME=$t/login.html DOCUMENT_ROOT=$t REMOTE_ADDR=$2 CL_PRIVATE_DIR=$t CONTENT_LENGTH=${#3} ./cl cgi | tail -1; }
+  for i in 1 2 3 4 5 6 7 8 9 10; do login wrong 1.2.3.4 p=wrong >/dev/null; done
+  login wrong 1.2.3.4 p=wrong | grep -q 'too many wrong passwords'          || fail "after 10 wrong passwords, an address must wait"
+  login right 1.2.3.4 p=right | grep -q 'too many wrong passwords'          || fail "the wait applies to the right password too"
+  [ "$(login right 5.6.7.8 p=right)" = "in" ]                                || fail "another address can still sign in"
+  [ "$(wc -l < $t/login.log | tr -d ' ')" = 10 ]                             || fail "only wrong passwords are counted"
+fi
+rm -rf $t
+
 # 4. Error messages
 t=$(mktemp -d)
 printf '<cl>show hello</cl>' > $t/a.html

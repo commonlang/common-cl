@@ -865,16 +865,46 @@ static int g_mail_sent;      /* emails sent by this page run */
    folder and is created on first use. */
 static char g_site_root[2048];
 static char g_secret[129];
+/* Where cl.secret, mail.log and outbox/ live. Under cl cgi this is a folder
+   outside the web root (see private_dir_for_cgi), so a missing or broken
+   .htaccess cannot expose them. Otherwise it is the site's own folder. */
+static char g_private_dir[2048];
+static const char *private_base(const char *fallback_dir) {
+    return g_private_dir[0] ? g_private_dir : g_site_root[0] ? g_site_root : fallback_dir;
+}
+
 static const char *site_secret(const char *fallback_dir) {
     if (g_secret[0]) return g_secret;
-    char path[4096]; snprintf(path, sizeof path, "%s/cl.secret", g_site_root[0] ? g_site_root : fallback_dir);
+    char path[4096]; snprintf(path, sizeof path, "%s/cl.secret", private_base(fallback_dir));
     FILE *f = fopen(path, "rb");
     if (f) { size_t n = fread(g_secret, 1, 128, f); fclose(f); g_secret[n] = 0; while (n && isspace((unsigned char)g_secret[n-1])) g_secret[--n] = 0; if (n >= 32) return g_secret; }
     unsigned char raw[32]; random_bytes(raw, 32); to_hex(raw, 32, g_secret);
     f = fopen(path, "wb");
-    if (f) { fputs(g_secret, f); fputc('\n', f); fclose(f); }
+    if (f) { fputs(g_secret, f); fputc('\n', f); fclose(f);
+#ifndef _WIN32
+        chmod(path, 0600);                                        /* only this account may read it */
+#endif
+    }
     else fprintf(stderr, "cl: cannot write %s, so remembered values will not survive a restart\n", path);
     return g_secret;
+}
+
+/* ---- wrong passwords: at most 10 from one address in 10 minutes ---- */
+/* Each check costs about 0.3 s of work on purpose, so guessing is slow; this
+   also stops one address from guessing at all, and from using the server's
+   time for it. Wrong attempts are noted in login.log in the private folder
+   (see private_base): one line per attempt, "<time> <address>". */
+#define LOGIN_TRIES 10
+#define LOGIN_WINDOW 600
+static char g_remote[64];            /* the visitor's address, under cl serve and cl cgi */
+static int login_recent(const char *log, time_t now) {
+    FILE *f = fopen(log, "r"); if (!f) return 0;
+    int n = 0; char line[128], who[80];
+    while (fgets(line, sizeof line, f)) {
+        long long t; if (sscanf(line, "%lld %79s", &t, who) != 2) continue;
+        if (now - (time_t)t < LOGIN_WINDOW && !strcmp(who, g_remote)) n++;
+    }
+    fclose(f); return n;
 }
 
 /* ---- sessions: a signed cookie, cl_session=<hex payload>.<hmac> ---- */
@@ -1590,7 +1620,14 @@ static void forgive_unquoted(Env *e) {
     fail("the words after '%s' need to be in double quotes: %s \"%s\"", prefix, prefix, quoted);
 }
 
-static Value parse_primary(Env *e, Toks *T) {
+static Value parse_primary_inner(Env *e, Toks *T);
+static Value parse_primary(Env *e, Toks *T) {     /* "count of count of ..." nests here */
+    expr_enter();
+    Value v = parse_primary_inner(e, T);
+    g_expr_depth--;
+    return v;
+}
+static Value parse_primary_inner(Env *e, Toks *T) {
     if (at_end(T)) fail("expected a value but the line ended");
     if (at_word(T, "try") && !(T->pos + 1 < T->n && T->t[T->pos+1].t == T_WORD && strcmp(T->t[T->pos+1].text, "of") == 0)) {
         T->pos++;
@@ -2039,8 +2076,15 @@ static Value parse_compare(Env *e, Toks *T) {
         if (e->sandbox) fail("'matches' is not allowed in practice code: it is slow on purpose, to protect passwords");
         Value r = parse_add(e, T); held_push(r);
         if (left.t != V_TEXT || r.t != V_TEXT) fail("'matches' compares text with a hash made by 'hash of'");
+        char log[4096]; time_t now = time(NULL);
+        if (g_remote[0]) {                                         /* a real visitor: limit wrong guesses */
+            snprintf(log, sizeof log, "%s/login.log", private_base(e->dir));
+            if (login_recent(log, now) >= LOGIN_TRIES)
+                fail("too many wrong passwords from this address. Wait %d minutes and try again", LOGIN_WINDOW / 60);
+        }
         held_pop(); held_pop();
         int ok = password_matches(left.s, r.s);
+        if (!ok && g_remote[0]) { FILE *lf = fopen(log, "a"); if (lf) { fprintf(lf, "%lld %s\n", (long long)now, g_remote); fclose(lf); } }
         v_free(&left); v_free(&r); return v_bool(ok);
     }
     if (!accept_word(T, "is")) { held_pop(); return left; }
@@ -2186,7 +2230,7 @@ static int opens_text_block(const SrcLine *L) {
     while (n && (t[n-1] == '.' || isspace((unsigned char)t[n-1]))) n--;     /* "show." is fine too */
     if (n == 4 && !strncmp(t, "show", 4)) return 1;
     if (n == 8 && !strncmp(t, "show raw", 8)) return 1;
-    if (n > 7 && !strncmp(t, "set ", 4) && !strncmp(t + n - 3, " to", 3)) {
+    if (n > 7 && !strncmp(t, "set ", 4) && (isalpha((unsigned char)t[4]) || t[4] == '_') && !strncmp(t + n - 3, " to", 3)) {
         for (size_t i = 4; i < n - 3; i++) if (!(isalnum((unsigned char)t[i]) || t[i] == '_')) return 0;
         return 1;
     }
@@ -2196,7 +2240,7 @@ static int opens_text_block(const SrcLine *L) {
 static int opens_record_block(const SrcLine *L) {
     const char *t = L->text; size_t n = L->len;
     while (n && (t[n-1] == '.' || isspace((unsigned char)t[n-1]))) n--;
-    if (n > 14 && !strncmp(t, "set ", 4) && !strncmp(t + n - 10, " to record", 10)) {
+    if (n > 14 && !strncmp(t, "set ", 4) && (isalpha((unsigned char)t[4]) || t[4] == '_') && !strncmp(t + n - 10, " to record", 10)) {
         for (size_t i = 4; i < n - 10; i++) if (!(isalnum((unsigned char)t[i]) || t[i] == '_')) return 0;
         return 1;
     }
@@ -2445,7 +2489,7 @@ static void send_email(Env *e, const Value *to_v, const Value *r) {
     else fail("say who the email is from: add a line like  from: \"site@yoursite.com\"  (an address on your own domain, so it is not marked as spam)");
 
     if (++g_mail_sent > MAIL_PER_PAGE) fail("a page can send at most %d emails each time it runs", MAIL_PER_PAGE);
-    const char *base = g_site_root[0] ? g_site_root : e->dir;
+    const char *base = private_base(e->dir);
     char log[4096]; snprintf(log, sizeof log, "%s/mail.log", base);
     time_t now = time(NULL);
     int per_hour = getenv("CL_MAIL_PER_HOUR") ? atoi(getenv("CL_MAIL_PER_HOUR")) : MAIL_PER_HOUR;
@@ -2629,7 +2673,17 @@ static void sandbox_step(Env *e) {
     if (e->sandbox && ++e->steps > 20000) fail("the practice code ran for too long (more than 20000 steps). Is a loop too big?");
 }
 
+static void exec_lines_inner(Env *e, Lines *L, int from, int to, Buf *out);
+/* Blocks inside blocks (if, for each, repeat, verbs) each take a C stack
+   frame, so their nesting has a limit too. */
+static int g_block_depth;
+#define MAX_BLOCK_DEPTH 500
 static void exec_lines(Env *e, Lines *L, int from, int to, Buf *out) {
+    if (++g_block_depth > MAX_BLOCK_DEPTH) { g_block_depth = 0; fail("blocks are nested too deeply (more than %d inside each other)", MAX_BLOCK_DEPTH); }
+    exec_lines_inner(e, L, from, to, out);
+    g_block_depth--;
+}
+static void exec_lines_inner(Env *e, Lines *L, int from, int to, Buf *out) {
     int i = from;
     e->out = out;
     while (i < to && !e->stopped) {
@@ -2907,11 +2961,12 @@ static const char *hl_code(const char *p, const char *end, Buf *out, int stop_at
    the caller is live across setjmp. */
 static int run_block(Env *env, Lines *L, Buf *o) {
     jmp_buf saved; memcpy(saved, err_jmp, sizeof(jmp_buf));
-    int ok; int mark = g_nlive, hmark = g_nheld, bmark = g_nbufs, fmark = g_nframes, dmark = g_expr_depth;
+    int ok; int mark = g_nlive, hmark = g_nheld, bmark = g_nbufs, fmark = g_nframes, dmark = g_expr_depth, kmark = g_block_depth;
     if (setjmp(err_jmp) == 0) { exec_lines(env, L, 0, L->n, o); ok = 1; }
     else {
         ok = 0;   /* free what the error left behind: token lists, held values, text buffers */
         g_expr_depth = dmark;                                      /* the expressions the error left were not finished */
+        g_block_depth = kmark;
         while (g_nlive > mark) { Toks dead = g_live[g_nlive - 1]; toks_free(&dead); }
         while (g_nheld > hmark) { Value dead = g_held[--g_nheld]; v_free(&dead); }
         while (g_nbufs > bmark) buf_free(g_bufs[--g_nbufs]);
@@ -3266,6 +3321,14 @@ static void send_response(sock_t fd, const Response *r, int head_only) {
 
 static void serve_one(sock_t c, const char *dir) {
     char *req, *method, *url, *body, *cookie = NULL; int cross = 0;
+    struct sockaddr_in peer; memset(&peer, 0, sizeof peer);       /* the visitor's address, for the password limit */
+#ifdef _WIN32
+    int plen = (int)sizeof peer;
+#else
+    socklen_t plen = sizeof peer;
+#endif
+    if (getpeername(c, (struct sockaddr *)&peer, &plen) == 0) snprintf(g_remote, sizeof g_remote, "%s", inet_ntoa(peer.sin_addr));
+    else snprintf(g_remote, sizeof g_remote, "unknown");
     if (!read_request(c, &req, &method, &url, &body, &cookie, &cross)) {
         Response bad; memset(&bad, 0, sizeof bad); plain(&bad, "400 Bad Request", "Bad request\n");
         send_response(c, &bad, 0); free(bad.body);
@@ -3336,6 +3399,32 @@ static void serve(const char *host, int port, const char *dir) {
 /* CGI mode: `cl cgi` behind Apache, nginx or any shared host          */
 /* ================================================================== */
 
+/* Under cl cgi: keep cl.secret, mail.log and outbox/ out of the web root, in
+   <the folder above DOCUMENT_ROOT>/.common/<the web root's name>/, for example
+   /home/you/.common/public_html/ for /home/you/public_html. Each site on the
+   account gets its own folder. CL_PRIVATE_DIR chooses another folder. If the
+   folder cannot be made, they stay next to the pages, protected by .htaccess. */
+static void private_dir_for_cgi(void) {
+    const char *chosen = getenv("CL_PRIVATE_DIR");
+    if (chosen && *chosen) { snprintf(g_private_dir, sizeof g_private_dir, "%s", chosen); return; }
+#ifndef _WIN32
+    const char *dr = getenv("DOCUMENT_ROOT");
+    if (!dr || !*dr) return;
+    char root[2048]; snprintf(root, sizeof root, "%s", dr);
+    size_t n = strlen(root); while (n > 1 && root[n - 1] == '/') root[--n] = 0;
+    char *slash = strrchr(root, '/');
+    if (!slash || slash == root || !slash[1]) return;
+    *slash = 0;                                                   /* root is now the folder above, slash+1 the web root's name */
+    char top[2100], mine[4200];
+    snprintf(top, sizeof top, "%s/.common", root);
+    snprintf(mine, sizeof mine, "%s/%s", top, slash + 1);
+    mkdir(top, 0700); mkdir(mine, 0700);
+    struct stat st;
+    if (stat(mine, &st) == 0 && S_ISDIR(st.st_mode) && access(mine, W_OK) == 0)
+        snprintf(g_private_dir, sizeof g_private_dir, "%s", mine);
+#endif
+}
+
 /* Does the name end in .html, whatever the case? */
 static int ends_with_html(const char *f) {
     size_t n = strlen(f);
@@ -3349,6 +3438,10 @@ static int run_cgi(void) {
     const char *https = getenv("HTTPS"), *proto = getenv("HTTP_X_FORWARDED_PROTO");
     g_https = (https && (!strcmp(https, "on") || !strcmp(https, "1"))) || (proto && !strcmp(proto, "https"));
     g_mail_live = 1;                   /* behind a real web server, emails really go out */
+    private_dir_for_cgi();
+    const char *ra = getenv("REMOTE_ADDR");
+    snprintf(g_remote, sizeof g_remote, "%s", ra && *ra ? ra : "unknown");
+    for (char *c = g_remote; *c; c++) if (isspace((unsigned char)*c)) *c = '_';
 
     /* Which page to run. Web servers say it in different ways:
        - nginx with fcgiwrap, and most direct setups: SCRIPT_FILENAME is the page.

@@ -16,6 +16,9 @@ Security fixes from an outside review. Every site should update.
 - Docs: put HTML attributes that hold a value in quotes; escaping cannot protect an unquoted attribute.
 - Fixed: the documented shared-hosting setup did not work on LiteSpeed, which many cPanel hosts run, because LiteSpeed ignores Apache's `Action` directive. The new `.htaccess` in `docs/deploy.md` uses only rewrite rules and works on Apache and LiteSpeed alike. `cl cgi` now finds the page from `SCRIPT_FILENAME`, `PATH_TRANSLATED` or `DOCUMENT_ROOT` plus `PATH_INFO`, whichever the server gives, and takes the visitor's address from `REQUEST_URI`, so clean addresses like `/blog/hello-world` work behind a rewrite.
 - New: under `cl cgi`, a missing page shows the site's own `404.html` with a 404 status, as `cl serve` does.
+- Fixed: more hostile practice code that crashed `cl`: `set 5 to` (a block with a number for a name), a long chain like `count of count of ...`, and thousands of nested blocks. Blocks now nest at most 500 deep.
+- New: after 10 wrong passwords from one address within 10 minutes, `matches` refuses that address until the 10 minutes are up. Each check is slow on purpose, so this also stops one visitor from using the server's time for guessing.
+- Changed: under `cl cgi`, `cl.secret`, `mail.log`, `login.log` and the outbox live outside the web root, in `<the folder above it>/.common/<its name>/` (for example `~/.common/public_html/`), readable only by you, so they no longer depend on `.htaccess` rules. `CL_PRIVATE_DIR` chooses another folder. Existing sign-ins end once, because a new `cl.secret` is made there.
 
 ## 0.4.0 (2026-10-29)
 

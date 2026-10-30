@@ -222,10 +222,14 @@ add lamp to products
 A value you `remember` is kept for that visitor in a signed cookie and comes
 back on every later page until they `forget` it, for up to 30 days after it
 was last changed. Nobody can forge it: the cookie and its end date are signed
-with a secret that Common creates in `cl.secret` in the site folder on first
-use, and never serves. `forget everything` signs out this browser; a copied
+with a secret that Common creates in `cl.secret` on first use, and never
+serves: next to the pages under `cl serve`, and outside the web root under
+`cl cgi` (see `docs/deploy.md`). `forget everything` signs out this browser; a copied
 cookie keeps working until its 30 days are up. To sign everyone out at once,
 delete `cl.secret`.
+
+After 10 wrong passwords from one address within 10 minutes, `matches` refuses
+that address until the 10 minutes are up, so nobody can keep guessing.
 
 | Word | Form | Meaning |
 |---|---|---|
@@ -234,7 +238,7 @@ delete `cl.secret`.
 | `forget` | `forget "user"` | Drop one value. |
 | `forget everything` | `forget everything` | Drop them all: sign out. |
 | `hash of` | `hash of form "password"` | A salted one-way scramble, safe to store (PBKDF2-HMAC-SHA256, 200,000 rounds). Hashes made by 0.3.0 and earlier still match. |
-| `matches` | `form "password" matches stored` | Yes if the text is the password behind the hash. |
+| `matches` | `form "password" matches stored` | Yes if the text is the password behind the hash. At most 10 wrong passwords per address every 10 minutes. |
 
 ```
 set users to ask database "select name, password from users where name = ?" with name

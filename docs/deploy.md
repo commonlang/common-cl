@@ -38,8 +38,13 @@ shared hosting; use a normal `make` on a server where you control the packages.
    one you have. It works on Apache and on LiteSpeed, which many shared hosts
    run: it uses only rewrite rules, because LiteSpeed ignores Apache's
    `Action` directive.
-4. **Open the site.** The first request creates `cl.secret` next to the pages.
-   Then lock down the data: `chmod 600 site.db cl.secret`. Shared hosts run CGI
+4. **Open the site.** The first request creates `cl.secret`, the key that signs
+   sign-in cookies, outside the web root: in `~/.common/public_html/`, readable
+   only by you. (If that folder cannot be made, it goes next to the pages, and
+   the `.htaccess` keeps it private. `SetEnv CL_PRIVATE_DIR /some/folder`
+   chooses another place.) Wrong-password counts (`login.log`) and, with
+   `CL_MAIL=outbox`, saved emails go there too. Then lock down the data:
+   `chmod 600 site.db`. Shared hosts run CGI
    as your own account (suEXEC), so `600` keeps other customers out.
 
 ```apache
@@ -81,8 +86,12 @@ If the host has gcc and SQLite headers, you can also build there: `gcc -O2 -std=
   it must not be group-writable (`755`, not `775`). cPanel's Error Log has the reason.
 - **Database is locked / cannot open.** The folder must be writable by your
   account, and the `.db` file `600` or `644`.
-- **Sign-in forgets everyone.** `cl.secret` could not be written: make the
-  folder writable, or create the file yourself with 64 random hex characters.
+- **Sign-in forgets everyone.** `cl.secret` could not be written: make
+  `~/.common/` writable, or create `~/.common/public_html/cl.secret` yourself
+  with 64 random hex characters.
+- **"Too many wrong passwords from this address".** Someone (maybe you) typed
+  10 wrong passwords within 10 minutes. Wait, or delete `login.log` in the
+  private folder.
 
 ## Apache or LiteSpeed (shared hosting, .htaccess)
 
@@ -180,8 +189,8 @@ sendmail, is not built in yet.
   for a small site.
 - Back up with `sqlite3 site.db ".backup copy.db"`, not `cp`, so you never
   copy a file mid-write.
-- `cl.secret` in the site folder signs session cookies. Common creates it on
-  first use and never serves it. Keep it with the site, `chmod 600`, and if it
+- `cl.secret` signs session cookies. Common creates it on first use (outside
+  the web root under `cl cgi`), readable only by you, and never serves it. If it
   ever leaks, delete it: everyone is signed out and a new one is made.
 - Common escapes output and binds database parameters. It has no rate limiting
   except on email, so a public guestbook will collect spam.
