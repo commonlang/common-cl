@@ -4,6 +4,19 @@ Changes go under **Unreleased** as they are made. `make release VERSION=X.Y.Z` t
 
 ## Unreleased
 
+Security fixes from an outside review. Every site should update.
+
+- Fixed: a stray control byte (`\x01`) inside a text in practice code (`try`) crashed `cl`, on the practice, quest and share pages. It is now an error.
+- Fixed: about 2,000 nested brackets, or thousands of `not`s, crashed the parser. Expressions now nest at most 200 deep.
+- Fixed: `go to` with a visitor's value accepted `/\evil.example`, which browsers follow to another site. Backslashes are refused there and encoded in every redirect address.
+- Fixed: `cl cgi` would run any file the web server pointed it at, so a request like `/cgi-bin/cl/cl.secret` could print the secret. It now runs only `.html` pages and never a private file.
+- Fixed: `cl serve` sent memory past the end of its header buffer when a cookie or redirect address was larger than 8 KB. It now answers 500.
+- Changed: `hash of` and `matches` are not allowed in practice code (`try`): password hashing is slow on purpose, and a loop of it could tie up the server for 30 seconds.
+- Changed: under `cl cgi` over HTTPS, the session cookie is marked `Secure`.
+- Docs: put HTML attributes that hold a value in quotes; escaping cannot protect an unquoted attribute.
+- Fixed: the documented shared-hosting setup did not work on LiteSpeed, which many cPanel hosts run, because LiteSpeed ignores Apache's `Action` directive. The new `.htaccess` in `docs/deploy.md` uses only rewrite rules and works on Apache and LiteSpeed alike. `cl cgi` now finds the page from `SCRIPT_FILENAME`, `PATH_TRANSLATED` or `DOCUMENT_ROOT` plus `PATH_INFO`, whichever the server gives, and takes the visitor's address from `REQUEST_URI`, so clean addresses like `/blog/hello-world` work behind a rewrite.
+- New: under `cl cgi`, a missing page shows the site's own `404.html` with a 404 status, as `cl serve` does.
+
 ## 0.4.0 (2026-10-29)
 
 Email, so a contact form can really send.

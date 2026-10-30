@@ -35,29 +35,35 @@ shared hosting; use a normal `make` on a server where you control the packages.
    permissions to `755`.
 2. **Upload the site.** Put your pages in `public_html/`.
 3. **Add the `.htaccess`** below to `public_html/`, or append its lines to the
-   one you have.
+   one you have. It works on Apache and on LiteSpeed, which many shared hosts
+   run: it uses only rewrite rules, because LiteSpeed ignores Apache's
+   `Action` directive.
 4. **Open the site.** The first request creates `cl.secret` next to the pages.
    Then lock down the data: `chmod 600 site.db cl.secret`. Shared hosts run CGI
    as your own account (suEXEC), so `600` keeps other customers out.
 
 ```apache
-# Run every .html page through Common
-Action common /cgi-bin/cl
-AddHandler common .html
-
-# Clean addresses: /about -> about.html, /blog/hello-world -> blog.html
+# Common (CL) on Apache or LiteSpeed. Uses only rewrite rules (no Action
+# directive, which LiteSpeed does not support). Needs mod_rewrite and a
+# cgi-bin folder with the cl program in it; cPanel hosts have both.
 RewriteEngine on
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^([^.]+)/.*$ $1.html [L]
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^([^.]+)$ $1.html [L]
 
-# Never serve the database, its seed, or the session secret (any case)
-<FilesMatch "(?i)\.(db|sqlite|sqlite3|sql|secret|eml|log)$|\.db-(journal|wal|shm)$">
-  Require all denied
-</FilesMatch>
+# Never send databases, seeds, the session secret or saved email.
+RewriteRule \.(db|sqlite|sqlite3|sql|secret|eml|log)$ - [F,NC]
+RewriteRule \.db-(journal|wal|shm)$ - [F,NC]
+RewriteRule (^|/)outbox(/|$) - [F,NC]
+
+# Requests that already go to cl pass straight through.
+RewriteRule ^cgi-bin/ - [L]
+
+# Pages run through cl: the home page, and any .html address.
+RewriteRule ^$ /cgi-bin/cl/index.html [L,QSA]
+RewriteRule ^(.+\.html)$ /cgi-bin/cl/$1 [L,QSA,NC]
+
+# Clean addresses: /about runs about.html, /blog/hello-world runs blog.html.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^([^./]+)(/.*)?$ /cgi-bin/cl/$1.html [L,QSA]
 ```
 
 Over SSH instead: `mkdir -p ~/public_html/cgi-bin && cp cl ~/public_html/cgi-bin/ && chmod 755 ~/public_html/cgi-bin/cl`.
@@ -65,9 +71,12 @@ If the host has gcc and SQLite headers, you can also build there: `gcc -O2 -std=
 
 **If it does not work**
 
-- **Raw `<cl>` text on the page.** The handler is not applied. Check that
-  `.htaccess` is in the pages' folder or a parent, and that `/cgi-bin/cl` in
-  the `Action` line matches where the binary is.
+- **Raw `<cl>` text on the page.** The rewrite rules are not applied. Check
+  that `.htaccess` is in `public_html/`, that it starts with `RewriteEngine on`,
+  and that `cl` is at `public_html/cgi-bin/cl`. An older setup that used
+  `Action common /cgi-bin/cl` does not work on LiteSpeed: use the rules above.
+- **Pages in a subfolder** (`shop/index.html`) are reached as `/shop/index.html`.
+  The clean-address rule covers pages in the top folder only.
 - **500 error.** Usually permissions: `cl` must be `755`, and the folders above
   it must not be group-writable (`755`, not `775`). cPanel's Error Log has the reason.
 - **Database is locked / cannot open.** The folder must be writable by your
@@ -75,25 +84,12 @@ If the host has gcc and SQLite headers, you can also build there: `gcc -O2 -std=
 - **Sign-in forgets everyone.** `cl.secret` could not be written: make the
   folder writable, or create the file yourself with 64 random hex characters.
 
-## Apache (shared hosting, .htaccess)
+## Apache or LiteSpeed (shared hosting, .htaccess)
 
-Copy the `cl` binary into `cgi-bin/` and add to `.htaccess` (also add the
-`FilesMatch` block from the cPanel section, so the database and `cl.secret` are never sent):
-
-```
-Action common /cgi-bin/cl
-AddHandler common .html
-RewriteEngine on
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteRule ^([^.]+)$ $1.html [L]
-```
-
-The last two lines give you clean URLs. `/blog/hello-world` needs one more:
-
-```
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteRule ^blog/ blog.html [L]
-```
+Copy the `cl` binary into `cgi-bin/` and use the `.htaccess` from the cPanel
+section above. It is the same file on Apache and on LiteSpeed: rewrite rules
+send every page to `/cgi-bin/cl/page.html`, `cl` runs it, and the visitor's
+address (`/blog/hello-world`) still reaches the page as `path`.
 
 ## nginx with fcgiwrap
 
@@ -156,11 +152,11 @@ and nearly every Linux host provide.
   SPF and DKIM as valid.
 - **sendmail somewhere else?** Set `CL_SENDMAIL` to its path, with
   `SetEnv CL_SENDMAIL /path/to/sendmail` in `.htaccess` on Apache.
-- **Testing on the live site without sending:** `SetEnv CL_MAIL outbox` saves
+- **Testing on the live site without sending:** `SetEnv CL_MAIL outbox` (Apache) saves
   emails in `outbox/` as files instead, like the development server does.
 - **Keep the files private.** `outbox/` and `mail.log` sit next to the pages.
-  The built-in server never sends them. Behind Apache, the `FilesMatch` block
-  above covers `.eml` and `.log` files. On nginx, add
+  The built-in server never sends them. Behind Apache or LiteSpeed, the
+  `.htaccess` above refuses `.eml`, `.log` and `outbox/`. On nginx, add
   `location ~ (/outbox/|\.(eml|log)$) { deny all; }`.
 - **The speed limit** is 20 emails an hour for the site, counted in
   `mail.log`. `SetEnv CL_MAIL_PER_HOUR 50` raises it.
@@ -174,7 +170,7 @@ sendmail, is not built in yet.
   database can sit next to the pages. Behind Apache or nginx it is the web
   server that sends static files, so add the same rule there, or keep the
   database in a folder above the site and `open database "../data/site.db"`.
-  Apache: `<FilesMatch "\.(db|sqlite|sql)$">Require all denied</FilesMatch>`.
+  Apache and LiteSpeed: the `.htaccess` in the cPanel section does it.
   nginx: `location ~ \.(db|sqlite|sql)$ { deny all; }`.
 - The file must be writable by the user the web server runs as, and readable
   by nobody else: `chmod 600 site.db`. On hosts where every site runs as the

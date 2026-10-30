@@ -151,7 +151,9 @@ makes new text from them.
 
 - **Showing them is always safe.** They are HTML-escaped when shown or placed in
   text. Never escape by hand. `show raw` turns escaping off: only use it for
-  HTML you wrote.
+  HTML you wrote. Always quote HTML attributes that hold a value
+  (`href='[url]'`): in an unquoted attribute a space ends the value, and the
+  escaping cannot help.
 - **SQL:** never put a visitor's value inside the SQL text. Write `?` and pass
   the values after `with`:
   `ask database "select * from posts where slug = ?" with slug`.

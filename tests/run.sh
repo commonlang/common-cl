@@ -139,6 +139,15 @@ printf 'f=hi' | SCRIPT_FILENAME=$t/p.html REQUEST_METHOD=POST CONTENT_LENGTH=4 .
 printf '<cl>go to "/x"</cl>' > $t/r.html
 SCRIPT_FILENAME=$t/r.html ./cl cgi | grep -q 'Status: 303' || fail "cgi redirect"
 SCRIPT_FILENAME=$t/nope.html ./cl cgi | grep -q 'Status: 404' || fail "cgi missing file"
+# The page and the visitor's address, however the web server names them
+printf '<cl>show "page=[path] q=[query "q"]"</cl>' > $t/blog.html
+printf '<cl>show "own 404 for [path]"</cl>' > $t/404.html
+SCRIPT_FILENAME=/srv/cgi-bin/cl PATH_INFO=/blog.html DOCUMENT_ROOT=$t REQUEST_URI='/blog/hello%20world?q=1' QUERY_STRING=q=1 ./cl cgi | grep -q '^page=/blog/hello world q=1' || fail "cgi behind a rewrite (Apache or LiteSpeed): the page from PATH_INFO, the address from REQUEST_URI"
+SCRIPT_FILENAME=/srv/cgi-bin/cl PATH_TRANSLATED=$t/blog.html REQUEST_URI=/blog ./cl cgi | grep -q '^page=/blog ' || fail "cgi with Apache's Action: the page from PATH_TRANSLATED"
+SCRIPT_FILENAME=$t/blog.html REQUEST_URI=/blog ./cl cgi | grep -q '^page=/blog '                || fail "cgi with nginx and fcgiwrap: the page from SCRIPT_FILENAME"
+c=$(SCRIPT_FILENAME=/srv/cgi-bin/cl PATH_INFO=/nope.html DOCUMENT_ROOT=$t REQUEST_URI=/nope ./cl cgi)
+echo "$c" | grep -q '^Status: 404 Not Found'                        || fail "cgi: a missing page is a 404"
+echo "$c" | grep -q '^own 404 for /nope'                            || fail "cgi: a missing page shows the site's own 404.html"
 rm -rf $t
 
 t=$(mktemp -d); printf '<cl-code>show "x"' > $t/u.html
@@ -446,6 +455,38 @@ printf '<cl>\nrepeat 3 times\n  show Hello there\nend\n</cl>\n' > $t/q.html
 ./cl $t/q.html | grep -q 'need to be in double quotes: show &quot;Hello there&quot;' || fail "the missing-quotes hint still works inside a loop"
 printf '<cl>\nset items to 1, 2, "x"\nfor each n in items\n  show n * 2\nend\n</cl>\n' > $t/e.html
 ./cl $t/e.html | tr '\n' ' ' | grep -q "^2 4 .*Common error: Line 4" || fail "an error on a later turn of a loop still names its line"
+rm -rf $t
+
+# 3p. Hostile input: crashes, redirects, CPU and private files (from a security review)
+t=$(mktemp -d)
+printf '<cl>show try form "code"</cl>' > $t/s.html
+./cl $t/s.html "" "code=show+%22a%01b%22" | grep -q 'invisible control character'  || fail "a stray hole marker in code is an error, not a crash"
+deep=$(python3 -I -c "import urllib.parse; print(urllib.parse.quote_plus('show ' + '('*3000 + '1' + ')'*3000))")
+./cl $t/s.html "" "code=$deep" | grep -q 'nests too deeply'          || fail "3000 nested brackets are an error, not a crash"
+deep=$(python3 -I -c "import urllib.parse; print(urllib.parse.quote_plus('show ' + 'not '*5000 + 'yes'))")
+./cl $t/s.html "" "code=$deep" | grep -q 'nests too deeply'          || fail "5000 nots are an error, not a crash"
+printf '<cl>show ((((1 + 2) * 3)))\nshow "[(2 * [3])]"</cl>' > $t/n.html
+./cl $t/n.html | grep -q '^9$'                                      || fail "ordinary brackets still work"
+./cl $t/s.html "" "code=show+hash+of+%22x%22" | grep -q "hash of&#39; is not allowed in practice code" || fail "hash of is not allowed in practice code"
+./cl $t/s.html "" "code=show+%22a%22+matches+%22b%22" | grep -q "matches&#39; is not allowed in practice code" || fail "matches is not allowed in practice code"
+printf '<cl>go to query "u"</cl>' > $t/g.html
+./cl $t/g.html 'u=/%5Cevil.example' | grep -q 'may only point to a page on this site' || fail "go to refuses /\\evil.example"
+printf '<cl>go to "/a\\\\b"</cl>' > $t/g2.html
+./cl $t/g2.html 2>&1 >/dev/null | grep -q 'goes to /a%5Cb'           || fail "a backslash in a go-to address is encoded"
+printf 'secret' > $t/cl.secret; printf 'x' > $t/site.db; printf '<cl>show "page"</cl>' > $t/p.html
+[ "$(SCRIPT_FILENAME=$t/cl.secret ./cl cgi | head -1 | tr -d '\r')" = "Status: 403 Forbidden" ] || fail "cgi never runs cl.secret"
+SCRIPT_FILENAME=$t/cl.secret ./cl cgi | grep -q secret              && fail "cgi never prints cl.secret"
+[ "$(PATH_TRANSLATED=$t/site.db ./cl cgi | head -1 | tr -d '\r')" = "Status: 403 Forbidden" ] || fail "cgi never runs a database"
+SCRIPT_FILENAME=$t/p.html ./cl cgi | grep -q '^page'                 || fail "cgi still runs pages"
+printf '<cl>remember "a" as "b"</cl>' > $t/r.html
+SCRIPT_FILENAME=$t/r.html HTTPS=on ./cl cgi | grep -q 'SameSite=Lax; Secure' || fail "cookies are Secure over HTTPS"
+SCRIPT_FILENAME=$t/r.html ./cl cgi | grep -q 'Secure'                && fail "cookies are not marked Secure over plain HTTP"
+printf '<cl>remember "big" as form "v"\nshow "ok"</cl>' > $t/index.html
+port=$((20000 + ($$ + 21) % 10000))
+(./cl serve $port $t >/dev/null 2>&1 &) ; sleep 0.5
+big=$(python3 -I -c "print('x' * 6000)")
+[ "$(curl -s -o /dev/null -w '%{http_code}' -d "v=$big" http://127.0.0.1:$port/)" = 500 ] || fail "a response header too big for the buffer is a 500, not a memory leak"
+pkill -f "cl serve $port"
 rm -rf $t
 
 # 4. Error messages

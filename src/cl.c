@@ -212,7 +212,7 @@ static const Word DICTIONARY[] = {
     { "item", "item N of LIST", "one item by position, counting from 1; or a column by name: item \"price\" of lamp", "show item 2 of fruits", 0 },
     { "query", "query \"name\"", "what the visitor typed in the URL after ?name=", "set name to query \"name\"", 0 },
     { "path", "path", "the URL path, like /about. The visitor typed it, so it is made safe like query", "set slug to last of split path by \"/\"", 0 },
-    { "try", "try TEXT", "run text as Common in a sandbox and give back what it said. No files, database, cookies or redirects; loops stop after 20000 steps and memory at 64 MB. For practice pages", "set result to try form \"code\"", 0 },
+    { "try", "try TEXT", "run text as Common in a sandbox and give back what it said. No files, database, cookies, redirects, email or password hashing; loops stop after 20000 steps and memory at 64 MB. For practice pages", "set result to try form \"code\"", 0 },
     { "dictionary", "dictionary", "every word of the language as records: word, form, meaning, example", "for each entry in dictionary\n  show \"<dt>[word of entry]</dt><dd>[meaning of entry]</dd>\"\nend", 0 },
     { "form", "form \"field\"", "what the visitor typed in a submitted form (POST)", "set message to trim of form \"message\"", 0 },
     { "remembered", "remembered \"name\"", "a value kept for this visitor, or empty text", "if remembered \"user\" is empty\n  go to \"/login\"\nend", 0 },
@@ -880,6 +880,7 @@ static const char *site_secret(const char *fallback_dir) {
 /* ---- sessions: a signed cookie, cl_session=<hex payload>.<hmac> ---- */
 
 #define SESSION_SECONDS 2592000      /* 30 days */
+static int g_https;                  /* the request came over HTTPS (cl cgi): cookies get Secure */
 
 static void session_set(Env *e, const char *k, const char *v) {
     if (e->root && e->root != e) e = e->root;
@@ -953,7 +954,7 @@ static char *session_cookie(Env *e) {
     unsigned char mac[32]; char machex[65];
     hmac_sha256(site_secret(e->dir), hex, strlen(hex), mac); to_hex(mac, 32, machex);
     char *out = malloc(strlen(hex) + 200);
-    sprintf(out, "cl_session=%s.%s; Path=/; Max-Age=%d; HttpOnly; SameSite=Lax", hex, machex, SESSION_SECONDS);
+    sprintf(out, "cl_session=%s.%s; Path=/; Max-Age=%d; HttpOnly; SameSite=Lax%s", hex, machex, SESSION_SECONDS, g_https ? "; Secure" : "");
     free(hex); buf_free(pl);
     return out;
 }
@@ -1056,6 +1057,10 @@ static void toks_free(Toks *T) {
 
 static void tokenize(const char *s, size_t len, Toks *T) {
     memset(T, 0, sizeof *T);
+    /* The bytes that mark a [hole] inside a text token can never come from source,
+       or a stray one would start a hole with no end. */
+    for (size_t k = 0; k < len; k++)
+        if (s[k] == HOLE_OPEN || s[k] == HOLE_CLOSE) fail("the line has an invisible control character in it (byte %d). Delete it and type the line again", s[k]);
     size_t i = 0;
     while (i < len) {
         char c = s[i];
@@ -1387,6 +1392,13 @@ static void db_tell(Env *e, const char *sql, Value *params) {
 }
 
 static Value parse_expr(Env *e, Toks *T);
+/* How deeply expressions are nested right now: brackets, holes, 'not', '-'.
+   Each level is a C stack frame, so a limit keeps a hostile line from crashing. */
+static int g_expr_depth;
+#define MAX_EXPR_DEPTH 200
+static void expr_enter(void) {
+    if (++g_expr_depth > MAX_EXPR_DEPTH) { g_expr_depth = 0; fail("the line nests too deeply (more than %d brackets, holes or 'not's inside each other)", MAX_EXPR_DEPTH); }
+}
 static Value parse_add(Env *e, Toks *T);
 
 /* Parse the optional "with VALUE, VALUE" after a database command. Each value
@@ -1469,6 +1481,7 @@ static Value fill_text(Env *e, const char *t) {
     while (*p) {
         if (*p != HOLE_OPEN) { buf_putc(b, *p++); continue; }
         const char *end = strchr(p + 1, HOLE_CLOSE);
+        if (!end) fail("the text has a [ with no closing ]");      /* cannot happen from source: tokenize refuses stray markers */
         Toks U; hole_tokens(p + 1, (size_t)(end - p - 1), &U);
         int owned = U.cap == -1;
         if (U.n == 0) fail("the brackets in the text are empty. Put a value inside, like [name]");
@@ -1783,6 +1796,7 @@ static Value parse_primary(Env *e, Toks *T) {
             return v;
         }
         if (!strcmp(fn, "hash")) {
+            if (e->sandbox) { held_push(v); fail("'hash of' is not allowed in practice code: it is slow on purpose, to protect passwords"); }
             if (v.t != V_TEXT) { held_push(v); fail("'hash of' needs text, not %s", type_name(v.t)); }
             char *h = password_hash(v.s); v_free(&v); Value r = v_text(h); free(h); return r;
         }
@@ -1940,14 +1954,15 @@ static Value parse_primary(Env *e, Toks *T) {
 }
 
 static Value parse_unary(Env *e, Toks *T) {
+    expr_enter();
     if (at_op(T, '-')) {
         T->pos++;
         Value v = parse_unary(e, T);
         if (v.t != V_NUM) fail("can only negate a number, not %s", type_name(v.t));
         v.n = -v.n;
-        return v;
+        { Value ret_ = v; g_expr_depth--; return ret_; }
     }
-    return parse_primary(e, T);
+    { Value ret_ = parse_primary(e, T); g_expr_depth--; return ret_; }
 }
 
 static Value parse_mul(Env *e, Toks *T) {
@@ -2021,6 +2036,7 @@ static Value parse_compare(Env *e, Toks *T) {
         v_free(&left); v_free(&r); return v_bool(found);
     }
     if (accept_word(T, "matches")) {
+        if (e->sandbox) fail("'matches' is not allowed in practice code: it is slow on purpose, to protect passwords");
         Value r = parse_add(e, T); held_push(r);
         if (left.t != V_TEXT || r.t != V_TEXT) fail("'matches' compares text with a hash made by 'hash of'");
         held_pop(); held_pop();
@@ -2074,12 +2090,13 @@ static Value parse_compare(Env *e, Toks *T) {
 }
 
 static Value parse_not(Env *e, Toks *T) {
+    expr_enter();
     if (accept_word(T, "not")) {
         Value v = parse_not(e, T);
         int r = !v_truthy(&v); v_free(&v);
-        return v_bool(r);
+        { Value ret_ = v_bool(r); g_expr_depth--; return ret_; }
     }
-    return parse_compare(e, T);
+    { Value ret_ = parse_compare(e, T); g_expr_depth--; return ret_; }
 }
 
 static Value parse_and(Env *e, Toks *T) {
@@ -2095,6 +2112,7 @@ static Value parse_and(Env *e, Toks *T) {
 }
 
 static Value parse_expr(Env *e, Toks *T) {
+    expr_enter();
     Value left = parse_and(e, T);
     while (accept_word(T, "or")) {
         held_push(left);
@@ -2103,6 +2121,7 @@ static Value parse_expr(Env *e, Toks *T) {
         int r = v_truthy(&left) || v_truthy(&right);
         v_free(&left); v_free(&right); left = v_bool(r);
     }
+    g_expr_depth--;
     return left;
 }
 
@@ -2707,7 +2726,7 @@ static void exec_lines(Env *e, Lines *L, int from, int to, Buf *out) {
             Value where = parse_expr(e, &T); held_push(where); expect_line_end(&T); held_pop();
             if (where.t != V_TEXT || !where.s[0]) fail("'go to' needs a page address in quotes, like \"/thanks.html\"");
             if (where.tainted) { char *t = plain_text(&where); free(where.s); where.s = t; }
-            if ((where.untrusted || where.tainted) && (strchr(where.s, ':') || !strncmp(where.s, "//", 2) || where.s[0] != '/'))
+            if ((where.untrusted || where.tainted) && (strchr(where.s, ':') || strchr(where.s, '\\') || !strncmp(where.s, "//", 2) || where.s[0] != '/'))
                 fail("'go to' with a visitor's value may only point to a page on this site, starting with /, like \"/blog/[slug]\". Otherwise a visitor could send people anywhere");
             snprintf(e->root->redirect, sizeof e->root->redirect, "%s", where.s);
             for (Env *x = e; x; x = x->parent) x->stopped = 1;
@@ -2888,10 +2907,11 @@ static const char *hl_code(const char *p, const char *end, Buf *out, int stop_at
    the caller is live across setjmp. */
 static int run_block(Env *env, Lines *L, Buf *o) {
     jmp_buf saved; memcpy(saved, err_jmp, sizeof(jmp_buf));
-    int ok; int mark = g_nlive, hmark = g_nheld, bmark = g_nbufs, fmark = g_nframes;
+    int ok; int mark = g_nlive, hmark = g_nheld, bmark = g_nbufs, fmark = g_nframes, dmark = g_expr_depth;
     if (setjmp(err_jmp) == 0) { exec_lines(env, L, 0, L->n, o); ok = 1; }
     else {
         ok = 0;   /* free what the error left behind: token lists, held values, text buffers */
+        g_expr_depth = dmark;                                      /* the expressions the error left were not finished */
         while (g_nlive > mark) { Toks dead = g_live[g_nlive - 1]; toks_free(&dead); }
         while (g_nheld > hmark) { Value dead = g_held[--g_nheld]; v_free(&dead); }
         while (g_nbufs > bmark) buf_free(g_bufs[--g_nbufs]);
@@ -3046,7 +3066,7 @@ static void run_page(const char *file, const char *html, const char *query, cons
         size_t j = 0;
         for (const char *c = env.redirect; *c && j + 4 < sizeof r->location; c++) {
             unsigned char u = (unsigned char)*c;
-            if (u <= ' ' || u >= 127 || u == '"' || u == '<' || u == '>') j += (size_t)snprintf(r->location + j, 4, "%%%02X", u);
+            if (u <= ' ' || u >= 127 || u == '"' || u == '<' || u == '>' || u == '\\') j += (size_t)snprintf(r->location + j, 4, "%%%02X", u);
             else r->location[j++] = *c;
         }
         r->location[j] = 0;
@@ -3236,6 +3256,10 @@ static void send_response(sock_t fd, const Response *r, int head_only) {
         r->location[0] ? "Location: " : "", r->location[0] ? r->location : "", r->location[0] ? "\r\n" : "",
         r->set_cookie ? "Set-Cookie: " : "", r->set_cookie ? r->set_cookie : "", r->set_cookie ? "\r\n" : "",
         r->cacheable ? "Cache-Control: max-age=3600\r\n" : "");
+    if (h < 0 || (size_t)h >= sizeof hdr) {                  /* a huge cookie or address: never send past the buffer */
+        static const char too_big[] = "HTTP/1.0 500 Internal Server Error\r\nContent-Type: text/plain\r\nContent-Length: 28\r\nConnection: close\r\n\r\nThe response was too large\n";
+        sock_write(fd, too_big, sizeof too_big - 1); return;
+    }
     if (sock_write(fd, hdr, (size_t)h) < 0) return;
     if (!head_only && r->len) sock_write(fd, r->body, r->len);
 }
@@ -3312,17 +3336,51 @@ static void serve(const char *host, int port, const char *dir) {
 /* CGI mode: `cl cgi` behind Apache, nginx or any shared host          */
 /* ================================================================== */
 
+/* Does the name end in .html, whatever the case? */
+static int ends_with_html(const char *f) {
+    size_t n = strlen(f);
+    if (n < 5) return 0;
+    char t[6]; for (int k = 0; k < 5; k++) t[k] = (char)tolower((unsigned char)f[n - 5 + k]);
+    t[5] = 0;
+    return !strcmp(t, ".html");
+}
+
 static int run_cgi(void) {
+    const char *https = getenv("HTTPS"), *proto = getenv("HTTP_X_FORWARDED_PROTO");
+    g_https = (https && (!strcmp(https, "on") || !strcmp(https, "1"))) || (proto && !strcmp(proto, "https"));
     g_mail_live = 1;                   /* behind a real web server, emails really go out */
-    const char *file = getenv("SCRIPT_FILENAME");
-    if (!file || !*file) file = getenv("PATH_TRANSLATED");
-    if (!file || !*file) { printf("Content-Type: text/plain\r\n\r\ncl cgi: the web server did not say which file to run (SCRIPT_FILENAME)\n"); return 1; }
+
+    /* Which page to run. Web servers say it in different ways:
+       - nginx with fcgiwrap, and most direct setups: SCRIPT_FILENAME is the page.
+       - Apache's Action, and a rewrite to /cgi-bin/cl/page.html (Apache and
+         LiteSpeed): SCRIPT_FILENAME is cl itself, and the page is
+         PATH_TRANSLATED, or DOCUMENT_ROOT followed by PATH_INFO. */
+    const char *sf = getenv("SCRIPT_FILENAME"), *pt = getenv("PATH_TRANSLATED");
+    const char *pi = getenv("PATH_INFO"), *dr = getenv("DOCUMENT_ROOT");
+    char built[4096];
+    const char *file = NULL;
+    if (sf && *sf && ends_with_html(sf)) file = sf;
+    else if (pt && *pt) file = pt;
+    else if (pi && *pi && dr && *dr) { snprintf(built, sizeof built, "%s%s", dr, pi); file = built; }
+    else if (sf && *sf) file = sf;
+    if (!file) { printf("Content-Type: text/plain\r\n\r\ncl cgi: the web server did not say which page to run (SCRIPT_FILENAME, PATH_TRANSLATED or PATH_INFO)\n"); return 1; }
+    /* A request like /cgi-bin/cl/cl.secret can point the server at any file:
+       run pages only, and never a database, seed, secret or saved email. */
+    if (!ends_with_html(file) || is_private(file) || strstr(file, "/../")) {
+        printf("Status: 403 Forbidden\r\nContent-Type: text/plain\r\n\r\nForbidden\n"); return 0;
+    }
 
 #ifndef _WIN32
     alarm(30);                         /* like the dev server: a runaway page gets 30 s */
 #endif
     const char *query = getenv("QUERY_STRING"); if (query && !*query) query = NULL;
-    const char *path  = getenv("PATH_INFO");    if (!path || !*path) path = getenv("SCRIPT_NAME");
+    /* The address the visitor asked for, like /blog/hello-world: REQUEST_URI
+       still has it after a rewrite turned it into /cgi-bin/cl/blog.html. */
+    char *path_buf = NULL;
+    const char *ru = getenv("REQUEST_URI");
+    if (ru && *ru) path_buf = url_decode(ru, strcspn(ru, "?"));
+    const char *path = path_buf;
+    if (!path || !*path) path = pi && *pi ? pi : getenv("SCRIPT_NAME");
     if (!path || !*path) path = "/";
 
     char *body = NULL;
@@ -3332,18 +3390,26 @@ static int run_cgi(void) {
 
     const char *method = getenv("REQUEST_METHOD");
     if (method && !strcmp(method, "POST") && cross_site(getenv("HTTP_ORIGIN"), getenv("HTTP_HOST"), getenv("HTTP_X_FORWARDED_HOST"))) {
-        printf("Status: 403 Forbidden\r\nContent-Type: text/plain\r\n\r\nForbidden: this form was sent from another site\n"); free(body); return 0;
+        printf("Status: 403 Forbidden\r\nContent-Type: text/plain\r\n\r\nForbidden: this form was sent from another site\n"); free(body); free(path_buf); return 0;
     }
     size_t len; char *html = read_file(file, &len);
-    if (!html) { printf("Status: 404 Not Found\r\nContent-Type: text/plain\r\n\r\nNot found\n"); free(body); return 0; }
+    const char *status = "200 OK";
+    char page404[4200];
+    if (!html) {                       /* a missing page: the site's own 404.html, as cl serve does */
+        char dir[4096]; dir_of(file, dir, sizeof dir);
+        snprintf(page404, sizeof page404, "%s/404.html", dir);
+        html = read_file(page404, &len);
+        if (!html) { printf("Status: 404 Not Found\r\nContent-Type: text/plain\r\n\r\nNot found\n"); free(body); free(path_buf); return 0; }
+        file = page404; status = "404 Not Found";
+    }
 
     Response r; memset(&r, 0, sizeof r);
-    run_page(file, html, query, body, path, getenv("HTTP_COOKIE"), "200 OK", &r);
+    run_page(file, html, query, body, path, getenv("HTTP_COOKIE"), status, &r);
     printf(SAFETY_HEADERS);
     if (r.set_cookie) printf("Set-Cookie: %s\r\n", r.set_cookie);
     if (r.location[0]) printf("Status: 303 See Other\r\nLocation: %s\r\n\r\n", r.location);
     else { printf("Status: %s\r\nContent-Type: %s\r\n\r\n", r.status, r.type); fwrite(r.body, 1, r.len, stdout); }
-    free(r.body); free(r.set_cookie); free(html); free(body);
+    free(r.body); free(r.set_cookie); free(html); free(body); free(path_buf);
     return 0;
 }
 
