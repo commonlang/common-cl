@@ -1,0 +1,36 @@
+# build output
+/cl
+/cl.dSYM/
+
+# editors and OS
+.DS_Store
+.vscode/
+/vscode/
+.idea/
+*.swp
+
+# per-site secret that signs session cookies (created on first use)
+cl.secret
+
+
+
+# emails saved by the development server, and the send log behind the speed limit
+outbox/
+mail.log
+
+# Not part of this repository: the demo site and its data, the downloads it
+# serves, and private planning notes.
+/examples/site/
+/examples/cookies/
+/examples/downloads/
+/tests/site.sh
+/docs/plan.md
+/docs/plan-0.2.md
+
+# databases, wherever they are
+*.db
+*.sqlite
+*.sqlite3
+
+# Claude Code settings and local skills for this machine
+.claude/

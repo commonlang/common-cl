@@ -1,0 +1,48 @@
+name: Bug report
+description: Common does something wrong, crashes, or gives a confusing error.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **Security problems go through [SECURITY.md](https://github.com/commonlang/cl/blob/main/SECURITY.md), not here.**
+  - type: textarea
+    id: page
+    attributes:
+      label: The smallest page that shows it
+      description: A few lines of Common is ideal.
+      render: html
+      placeholder: |
+        <cl>
+          show "hello"
+        </cl>
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: How you ran it
+      placeholder: ./cl page.html "name=Ada"   or   cl serve 8000 site, then opened /page
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: What happened
+      description: The output of ./cl page.html, or what the browser showed.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version and system
+      placeholder: "./cl version → Common (CL) 0.4.0, macOS 15, built with make"
+    validations:
+      required: true

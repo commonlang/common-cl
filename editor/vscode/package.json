@@ -1,0 +1,31 @@
+{
+  "name": "common-cl",
+  "displayName": "Common (CL)",
+  "description": "Highlights Common (CL) code inside <cl> and <cl-code> blocks in HTML files.",
+  "version": "0.4.0",
+  "publisher": "common-cl",
+  "homepage": "https://commonlang.org",
+  "license": "Apache-2.0",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "grammars": [
+      {
+        "scopeName": "source.cl.injection",
+        "path": "./syntaxes/cl.injection.json",
+        "injectTo": [
+          "text.html.basic",
+          "text.html.derivative"
+        ]
+      },
+      {
+        "scopeName": "source.cl",
+        "path": "./syntaxes/cl.json"
+      }
+    ]
+  }
+}

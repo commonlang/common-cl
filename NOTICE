@@ -1,0 +1,10 @@
+Common (CL), https://commonlang.org
+Copyright 2026 The Common (CL) Authors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+It contains no third-party source code. When built, it can optionally link
+against libraries installed on the build machine, which are not part of this
+product and keep their own licenses:
+  - SQLite (public domain), when sqlite3.h is found
+  - libpq, the PostgreSQL client library (PostgreSQL License), when pg_config is found

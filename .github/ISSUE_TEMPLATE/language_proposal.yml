@@ -1,0 +1,36 @@
+name: Language proposal
+description: Propose a new word or form, or a change to an existing one.
+labels: [language]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Common stays small on purpose: one form per word, and every word is forever.
+        Please describe the problem first. The maintainers decide on language changes
+        before any code is written (see CONTRIBUTING.md).
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The real page or task, in a sentence or two.
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: How you do it in Common today
+      description: The code you write now, even if it is long or awkward.
+      render: html
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: The form you propose
+      description: The exact words, one form only. What should the error say when it is used wrong?
+      render: html
+  - type: textarea
+    id: others
+    attributes:
+      label: What people will try from other languages
+      description: Spellings that should become teaching errors pointing to the new word (they go in SYNONYMS).

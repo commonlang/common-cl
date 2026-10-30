@@ -1,0 +1,22 @@
+# A pull request that touches any of these needs this owner's review, even when
+# an agent opened it (see MAINTAINING.md).
+
+# The interpreter: the language, its safety rules, sessions, email.
+/src/cl.c                @brightbirdapp
+
+# Automation and the build: templates, CODEOWNERS itself.
+/.github/                @brightbirdapp
+/scripts/                @brightbirdapp
+/Makefile                @brightbirdapp
+
+# The rules agents and contributors follow.
+/AGENTS.md               @brightbirdapp
+/MAINTAINING.md          @brightbirdapp
+/CONTRIBUTING.md         @brightbirdapp
+
+# Legal and policy.
+/LICENSE                 @brightbirdapp
+/NOTICE                  @brightbirdapp
+/DISCLAIMER.md           @brightbirdapp
+/SECURITY.md             @brightbirdapp
+/CODE_OF_CONDUCT.md      @brightbirdapp

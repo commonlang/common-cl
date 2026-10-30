@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<!-- A list and a detail page from one file, with clean URLs:
+     /posts lists every post, /posts/some-slug shows one.
+     Needs site.db next to it with: create table posts (slug text, title text, body text, posted text) -->
+<cl>
+  open database "site.db"
+  set slug to last of split path by "/"
+  if slug is "posts"
+    set posts to ask database "select slug, title, posted from posts order by posted desc"
+  otherwise
+    set posts to ask database "select title, body, posted from posts where slug = ?" with slug
+  end
+</cl>
+<head><meta charset="utf-8"><title>Posts</title></head>
+<body>
+  <cl>
+    if slug is "posts"
+      show "<h1>Posts</h1><ul>"
+      for each post in posts
+        show "<li><a href='/posts/[slug of post]'>[title of post]</a>, [date of posted of post]</li>"
+      end
+      show "</ul>"
+    otherwise if posts is empty
+      show "<h1>Not found</h1><p>There is no post called [slug].</p>"
+    otherwise
+      set post to first of posts
+      show "<h1>[title of post]</h1>"
+      for each paragraph in paragraphs of body of post
+        show "<p>[paragraph]</p>"
+      end
+      show "<p><a href='/posts'>All posts</a></p>"
+    end
+  </cl>
+</body>
+</html>

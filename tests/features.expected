@@ -1,0 +1,143 @@
+Hello, World!
+Total: 13.5
+No messages.
+We have 4 fruits: apple, banana, cherry, date
+first apple, last date
+- apple
+- banana
+- cherry
+- date
+*
+*
+*
+n is big
+yes works
+no
+visitor: Ada Lovelace
+evil joined: <i>&lt;b&gt;x&lt;/b&gt;</i>
+&lt;b&gt;x&lt;/b&gt;
+ok, fine, &lt;b&gt;x&lt;/b&gt;
+<b>x</b>
+missing is empty
+<b>bold</b>
+<i>literal html is trusted</i>
+9
+2.5
+-7
+<p>plain html stays</p>
+before error
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 54: can only subtract numbers, not text and a number</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 57: this 'if' is never closed. Add a line with just 'end' after the lines it decides about</pre>
+<p>new words</p>
+Hello, World|  HELLO, WORLD  |  hello, world  
+hello,-world
+2 parts: blog, my-post, last my-post
+42 + 1 = 43
+empty: 0
+1 name: Ada
+<p>One.</p>
+<p>Two.</p>
+<p>Three.</p>
+form name: &lt;b&gt;Ada, upper: &lt;B&gt;ADA
+form number: 21 * 2 = 42
+today has 3 parts
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 80: &quot;abc&quot; is not a number</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 81: 'split ... by' needs a separator in quotes, like &quot;/&quot; or &quot;,&quot;</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 82: '+' adds numbers, but got text and a number. To put a value in text, write it in brackets: &quot;Hello [name]&quot;</pre>
+<p>code samples</p>
+<pre><span class="cl-note"># a note</span>
+<span class="cl-word">set</span> fruits <span class="cl-word">to</span> <span class="cl-text">&quot;apple&quot;</span>, <span class="cl-text">&quot;banana&quot;</span>
+<span class="cl-word">show</span> <span class="cl-text">&quot;We have </span><span class="cl-hole">[<span class="cl-word">count</span> <span class="cl-word">of</span> fruits]</span><span class="cl-text"> fruits: &lt;b&gt;</span><span class="cl-hole">[<span class="cl-word">first</span> <span class="cl-word">of</span> fruits]</span><span class="cl-text">&lt;/b&gt; \[not a hole]&quot;</span>
+<span class="cl-word">for</span> <span class="cl-word">each</span> fruit <span class="cl-word">in</span> fruits
+  <span class="cl-word">show</span> <span class="cl-text">&quot;&lt;li&gt;</span><span class="cl-hole">[fruit]</span><span class="cl-text">&lt;/li&gt;&quot;</span>
+<span class="cl-word">end</span>
+</pre>
+<span class="cl-tag">&lt;cl&gt;</span><span class="cl-word">show</span> <span class="cl-text">&quot;x </span><span class="cl-hole">[<span class="cl-word">query</span> <span class="cl-text">&quot;name&quot;</span>]</span><span class="cl-text">&quot;</span><span class="cl-tag">&lt;/cl&gt;</span>
+<p>more words</p>
+Ada, Grace, Linus | Grace, Ada, Linus | Ada, Grace | Grace
+2, 10, 33 | 10, 2
+Héllo|wörld|5
+24 October 2026 / 2026 / February / 24
+contains works
+cl2$ 108
+password ok
+wrong rejected
+nothing remembered: |
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 116: I do not know what 'sic' is. Did you mean 'set'? If you meant a real bracket in the text, write \[</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 117: &quot;yesterday&quot; is not a date like 2026-10-24</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 118: 'sort of' needs a list, not text</pre>
+no
+<p>forgiving</p>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 121: the words after 'show' need to be in double quotes: show &quot;Hello, world!&quot;</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 122: the words after 'show' need to be in double quotes: show &quot;Hello, [name]!&quot;</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 123: the words after 'set greeting to' need to be in double quotes: set greeting to &quot;Good morning&quot;</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 124: I do not know what 'Ada' is. Did you mean 'add'? If you meant a real bracket in the text, write \[</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 126: 'print' is not a Common word. Use 'show', and put the words in double quotes: show &quot;Hello there&quot;</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 127: the words after 'show raw' need to be in double quotes: show raw &quot;&lt;b&gt;bold&lt;/b&gt;&quot;</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 129: I do not know what 'total' is. Did you mean 'totl'? If you meant a real bracket in the text, write \[</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 130: the words after 'show' need to be in double quotes: show &quot;hello&quot;</pre>
+<p>sentences and blocks</p>
+3 fruits, the first is apple
+a few
+not many
+<div class="card">
+  <h5>Cards</h5>
+  if you like it, sign the book
+  <p>3 fruits: apple, banana, cherry</p>
+</div>
+2 paragraphs
+<li>apple</li>
+<li>banana</li>
+<li>cherry</li>
+<b>raw block</b>
+visitor in a block:
+<i>Ada Lovelace</i>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 169: this text block is never closed. Add a line with just 'end' after the text</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 171: 'is between' is written: X is between LOW and HIGH</pre>
+<p>verbs, records, until</p>
+<p>Hello, Ada from Common!</p>
+site is still Common
+QUIET and COMMON
+hello-world
+3…
+2…
+1…
+liftoff
+6
+Desk lamp costs $19, tags light, desk
+15 7 Desk lamp
+15
+Desk lamp
+stopped at 3
+turn
+turn
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 231: 'greet' takes 1 value, but got 0. It is written: greet someone</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 232: 'greet' takes 1 value, but got more. It is written: greet someone</pre>
+<p>Hello, x from Common!</p>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 233: 'greet' does not give a value. Add 'give VALUE' inside it, or call it on its own line</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 234: 'give' only works inside a verb (a block that starts with 'to')</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 236: 'forever' calls itself too deeply (more than 100 levels)</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 240: each line of a record is written: column: VALUE</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 242: 'countdown' takes 1 value. It is written: countdown n</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 243: this verb is never closed. Add a line with just 'end' after its lines</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 245: 'site' is text, not a record, so it has no 'price' to set</pre>
+<p>strictness</p>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 247: '+' adds numbers, but got text and a number. To put a value in text, write it in brackets: &quot;Hello [name]&quot;</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 248: the brackets in the text are empty. Put a value inside, like [name]</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 249: the text has a [ with no closing ]</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 250: brackets only work inside text, like &quot;Hello [name]&quot;</pre>
+a literal [bracket] and a h with quotes
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 252: 'show' is a Common word: show VALUE  /  show ... end, so it cannot be a name. Pick another, like my_show</pre>
+1999 3 2026 3
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 256: expected 'to'. The whole line is written: set NAME to VALUE</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 257: 'Say' is not a Common word. Use 'show': show &quot;x&quot;</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 258: 'print' is not a Common word. Use 'show': show &quot;x&quot;</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 260: Common has no '='. Write 'set NAME to VALUE' to store, or 'is' to compare</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 261: 'bigger' is not a Common word. Use 'more'</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 263: I do not understand 'sey'. Did you mean 'set'?</pre>
+1
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 266: 'else' is not a Common word. Use 'otherwise'</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 268: Common has no '&gt;'. Write 'is more than'</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 271: a line cannot start with 'age'. Did you mean 'show age' or 'set age to ...'?</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 272: text goes in double quotes, like &quot;this&quot;</pre>
+<pre class="cl-error" style="color:#c62828;white-space:pre-wrap">Common error: Line 274: there is no item 3. The list has 2 items</pre>

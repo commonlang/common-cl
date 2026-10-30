@@ -1,0 +1,274 @@
+<cl>
+set name to "World"
+show "Hello, [name]!"
+set price to 4.50
+set quantity to 3
+show "Total: [price * quantity]"
+set messages to 0
+if messages is 0
+  show "No messages."
+otherwise if messages is 1
+  show "One message."
+otherwise
+  show "[messages] messages."
+end
+set fruits to "apple", "banana", "cherry"
+add "date" to fruits
+show "We have [count of fruits] fruits: [fruits]"
+show "first [first of fruits], last [last of fruits]"
+for each fruit in fruits
+  show "- [fruit]"
+end
+repeat 3 times
+  show "*"
+end
+set n to 7
+if n is more than 5 and n is not 10
+  show "n is big"
+end
+if n is at least 7 or no
+  show "yes works"
+end
+show not yes
+show "visitor: [query "name"]"
+show "evil joined: <i>[query "evil"]</i>"
+show query "evil"
+set visitors to "ok", "fine"
+add query "evil" to visitors
+show visitors
+show raw query "evil"
+set v to query "missing"
+if v is empty
+  show "missing is empty"
+end
+show raw "<b>bold</b>"
+show "<i>literal html is trusted</i>"
+show (1 + 2) * 3
+show 10 / 4
+show -n
+</cl>
+<p>plain html stays</p>
+<cl>
+show "before error"
+set x to 1
+show "a" - 2
+</cl>
+<cl>
+if yes
+  show "never closed"
+</cl>
+<p>new words</p>
+<cl>
+set heading to "  Hello, World  "
+show "[trim of heading]|[uppercase of heading]|[lowercase of heading]"
+show replace " " with "-" in lowercase of trim of heading
+set parts to split "/blog/my-post" by "/"
+show "[count of parts] parts: [parts], last [last of parts]"
+show "[number of " 42 "] + 1 = [number of " 42 " + 1]"
+set names to empty list
+show "empty: [count of names]"
+add "Ada" to names
+show "[count of names] name: [names]"
+set story to "One.\n\n  Two.  \n\n\nThree."
+for each paragraph in paragraphs of story
+  show "<p>[paragraph]</p>"
+end
+show "form name: [form "name"], upper: [uppercase of form "name"]"
+show "form number: [number of form "n"] * 2 = [number of form "n" * 2]"
+show "today has [count of split today by "-"] parts"
+</cl>
+<cl>show number of "abc"</cl>
+<cl>show split "a,b" by ""</cl>
+<cl>show "x" + 1</cl>
+<p>code samples</p>
+<pre><cl-code>
+# a note
+set fruits to "apple", "banana"
+show "We have [count of fruits] fruits: <b>[first of fruits]</b> \[not a hole]"
+for each fruit in fruits
+  show "<li>[fruit]</li>"
+end
+</cl-code></pre>
+<cl-code><cl>show "x [query "name"]"</cl></cl-code>
+<p>more words</p>
+<cl>
+set names to "Linus", "Ada", "Grace"
+show "[sort of names] | [reverse of names] | [first 2 of sort of names] | [last 1 of names]"
+set nums to 10, 2, 33
+show "[sort of nums] | [first 2 of nums]"
+show "[first 5 of "Héllo wörld"]|[last 5 of "Héllo wörld"]|[count of "Héllo"]"
+show "[date of "2026-10-24"] / [year of "2026-10-24"] / [month of "2026-02-01"] / [day of "2026-10-24"]"
+if "ada@example.com" contains "@" and names contains "Ada" and not (names contains "Bob")
+  show "contains works"
+end
+set stored to hash of "cookies"
+show "[first 4 of stored] [count of stored]"
+if "cookies" matches stored
+  show "password ok"
+end
+if "wrong" matches stored
+  show "BAD"
+otherwise
+  show "wrong rejected"
+end
+show "nothing remembered: [remembered "user"]|"
+</cl>
+<cl>show "[sic]"</cl>
+<cl>show date of "yesterday"</cl>
+<cl>show sort of "text"</cl>
+<cl>show "x" matches "not a hash"</cl>
+<p>forgiving</p>
+<cl>show Hello, world!</cl>
+<cl>show Hello, [name]!</cl>
+<cl>set greeting to Good morning</cl>
+<cl>if "x" is Ada
+end</cl>
+<cl>print Hello there</cl>
+<cl>show raw <b>bold</b></cl>
+<cl>set totl to 1
+show total</cl>
+<cl>show hello</cl>
+<p>sentences and blocks</p>
+<cl>
+set fruits to "apple", "banana", "cherry".
+set total to the count of fruits.
+show "[total] fruits, the first is [the first of fruits]".
+if total is between 1 and 5
+  show "a few"
+end
+if the total is not between 10 and 20
+  show "not many".
+end
+set heading to "Cards"
+show
+  <div class="card">
+    <h5>[heading]</h5>
+    if you like it, sign the book
+    <p>[total] fruits: [fruits]</p>
+  </div>
+end
+set story to
+  One line.
+
+  Then another, with "quotes" and a \[bracket].
+end
+show "[count of paragraphs of story] paragraphs"
+for each fruit in fruits
+  show
+    <li>[fruit]</li>
+  end
+end
+show raw
+  <b>raw block</b>
+end
+show "visitor in a block:"
+show
+  <i>[query "name"]</i>
+end
+</cl>
+<cl>show
+  never closed</cl>
+<cl>if 3 is between 1
+end</cl>
+<p>verbs, records, until</p>
+<cl>
+set site to "Common"
+to greet someone
+  show "<p>Hello, [someone] from [site]!</p>"
+  set site to "changed inside"
+end
+greet "Ada"
+show "site is still [site]"
+to shout words
+  give uppercase of words
+end
+show "[shout "quiet"] and [shout site]"
+to slug_of heading
+  give replace " " with "-" in lowercase of trim of heading
+end
+show "[slug_of "  Hello World "]"
+to countdown n
+  if n is 0
+    show "liftoff"
+  otherwise
+    show "[n]…"
+    countdown n - 1
+  end
+end
+countdown 3
+to twice x y
+  give x + y + x + y
+end
+show "[twice 1 2]"
+set lamp to record
+  name: "Desk lamp"
+  price: 19
+  tags: "light", "desk"
+  # a comment
+end
+show "[name of lamp] costs $[price of lamp], tags [tags of lamp]"
+set price of lamp to 15
+set stock of lamp to 7
+show "[price of lamp] [stock of lamp] [item "name" of lamp]"
+set key to "price"
+show "[item key of lamp]"
+set products to empty list
+add lamp to products
+show "[name of first of products]"
+set done to no
+set n to 0
+repeat 100 times until done
+  set n to n + 1
+  if n is 3
+    set done to yes
+  end
+end
+show "stopped at [n]"
+repeat 2 times until no
+  show "turn"
+end
+</cl>
+<cl>greet</cl>
+<cl>greet "a" "b"</cl>
+<cl>show "[greet "x"]"</cl>
+<cl>give 1</cl>
+<cl>to forever
+  forever
+end
+forever</cl>
+<cl>set r to record
+  no colon here
+end</cl>
+<cl>show countdown</cl>
+<cl>to greet2 x
+  show x</cl>
+<cl>set price of site to 1</cl>
+<p>strictness</p>
+<cl>show "a" + 1</cl>
+<cl>show "[]"</cl>
+<cl>show "no end [here"</cl>
+<cl>show [x]</cl>
+<cl>show "a literal \[bracket] and a [first of "hole"] with quotes"</cl>
+<cl>set show to 1</cl>
+<cl>set year to 1999
+set count to 3
+show "[year] [count] [year of "2026-01-02"] [count of "abc"]"</cl>
+<cl>set x 5</cl>
+<cl>Say "x"</cl>
+<cl>print "x"</cl>
+<cl>set x to 5
+x = 6</cl>
+<cl>if 3 is bigger than 2
+end</cl>
+<cl>sey "x"</cl>
+<cl>set total to 1
+show totl</cl>
+<cl>else</cl>
+<cl>set age to 3
+if age > 2
+end</cl>
+<cl>set age to 3
+age</cl>
+<cl>show 'x'</cl>
+<cl>set my_list to 1, 2
+show item 3 of my_list</cl>

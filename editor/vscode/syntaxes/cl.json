@@ -1,0 +1,87 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Common (CL)",
+  "scopeName": "source.cl",
+  "patterns": [
+    {
+      "include": "#comment"
+    },
+    {
+      "include": "#string"
+    },
+    {
+      "include": "#keyword"
+    },
+    {
+      "include": "#number"
+    },
+    {
+      "include": "#operator"
+    },
+    {
+      "include": "#name"
+    }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.number-sign.cl",
+      "match": "#.*$"
+    },
+    "string": {
+      "name": "string.quoted.double.cl",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.cl",
+          "match": "\\\\[\"\\\\n\\[]"
+        },
+        {
+          "name": "meta.hole.cl",
+          "begin": "\\[",
+          "end": "\\]",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.hole.begin.cl"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.hole.end.cl"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#keyword"
+            },
+            {
+              "include": "#number"
+            },
+            {
+              "include": "#string"
+            },
+            {
+              "include": "#name"
+            }
+          ]
+        }
+      ]
+    },
+    "keyword": {
+      "name": "keyword.control.cl",
+      "match": "\\b(show|raw|set|to|add|if|otherwise|end|for|each|in|repeat|times|include|go|open|database|ask|tell|with|remember|as|forget|everything|send|email|an|yes|no|count|first|last|item|of|query|form|path|remembered|today|now|number|empty|list|uppercase|lowercase|trim|paragraphs|split|by|replace|hash|sort|reverse|date|year|month|day|is|not|more|less|than|at|least|most|and|or|contains|matches|page|text|dictionary|code|try|the|between|give|record|until)\\b"
+    },
+    "number": {
+      "name": "constant.numeric.cl",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    },
+    "operator": {
+      "name": "keyword.operator.cl",
+      "match": "[-+*/(),]"
+    },
+    "name": {
+      "name": "variable.other.cl",
+      "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+    }
+  }
+}

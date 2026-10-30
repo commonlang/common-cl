@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Hello from Common</title>
+</head>
+<body>
+  <cl>
+    # Try it with a name in the address: /hello?name=Ada
+    set name to trim of query "name"
+    if name is empty
+      set name to "friend"
+    end
+    show "<h1>Hello, [name]!</h1>"
+
+    set fruits to "apple", "banana", "cherry"
+    show "<p>We have [count of fruits] fruits:</p>"
+    show "<ul>"
+    for each fruit in fruits
+      show "<li>[fruit]</li>"
+    end
+    show "</ul>"
+
+    show "<p>Today is [date of today].</p>"
+  </cl>
+</body>
+</html>

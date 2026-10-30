@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<cl>
+  set title to "Home"
+  include "header.html"
+</cl>
+<h1><cl>show "Welcome to [site_name]"</cl></h1>
+<cl>
+  # A verb keeps repeated markup in one place.
+  to card heading blurb
+    show
+      <section>
+        <h2>[heading]</h2>
+        <p>[blurb]</p>
+      </section>
+    end
+  end
+  card "Fast" "One file, no build step."
+  card "Safe" "Visitor text is escaped for you."
+</cl>
+<cl>
+  include "footer.html"
+</cl>
