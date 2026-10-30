@@ -48,35 +48,46 @@ page, at its name without the extension.
 
 ## The language in one screen
 
+A page is HTML with Common inside `<cl>` tags. Open it as `/page?name=Ada`:
+
+```html
+<cl>
+  set name to trim of query "name"
+  if name is empty
+    set name to "friend"
+  end
+  show "<h1>Hello, [name]!</h1>"
+
+  set fruits to "apple", "banana", "cherry"
+  add "plum" to fruits
+  show "<p>[count of fruits] fruits:</p>"
+  for each fruit in fruits
+    show "<li>[uppercase of fruit]</li>"
+  end
+</cl>
 ```
-show "Hello, [name]!"               show raw "<b>unescaped</b>"
-set name to "Ada"                  set total to price * 3
-show "[count of list] items at $[price * 3] each"
-set list to "a", "b", "c"          add "d" to list
-count of list    first of list     last of list    item 2 of list
-query "name"     form "name"       path              include "header.html"
-today            now               number of text    empty list
-uppercase of x   lowercase of x    trim of x         paragraphs of x
-split x by "/"   replace "a" with "b" in x           go to "/thanks"
-open database "site.db"            tell database "insert ..." with a, b
-set rows to ask database "select * from posts where slug = ?" with slug
-send email to "you@site.com"  then subject:, body:, reply to:, from: lines, then end
 
-if age is at least 18
-  show "Welcome"
-otherwise if age is more than 12
-  show "Almost"
-otherwise
-  show "Not yet"
-end
+The words you will use most:
 
-for each item_name in list         repeat 3 times
-  show item_name                      show "*"
-end                                end
+| To | Write |
+|---|---|
+| Show something | `show "Hello, [name]!"` |
+| Keep a value | `set total to price * 3` |
+| Make a list, add to it | `set list to "a", "b"` · `add "c" to list` |
+| Decide | `if age is at least 18` … `otherwise` … `end` |
+| Repeat | `for each item in list` … `end` · `repeat 3 times` … `end` |
+| Compare | `is` · `is not` · `is more than` · `is at least` · `is empty` · `and` · `or` · `not` |
+| Read the visitor | `query "name"` · `form "email"` · `path` |
+| Work with text | `trim of x` · `uppercase of x` · `split x by "/"` · `replace "a" with "b" in x` |
+| Work with lists | `count of x` · `first of x` · `last of x` · `item 2 of x` |
+| Dates | `today` · `now` · `date of today` |
+| A database | `open database "site.db"` · `ask database "select …" with a` · `tell database "insert …" with a, b` |
+| Build a site | `include "header.html"` · `go to "/thanks"` |
+| Remember a visitor | `remember "user" as name` · `remembered "user"` · `forget everything` |
+| Send email | `send email to "you@site.com"` … `end` · `is an email` |
+| Your own commands | `to greet someone` … `end` · `give value` |
 
-is, is not, is more than, is less than, is at least, is at most, is empty
-and, or, not, yes, no              is an email      # comments
-```
+Every word has exactly one form. `./cl words` lists them all.
 
 To show Common code on a page, wrap it in `<cl-code>`: the interpreter
 escapes it and marks its own words so a stylesheet can color them.
