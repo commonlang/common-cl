@@ -48,7 +48,7 @@ A command is the first word on a line.
 | `for each` | `for each NAME in LIST` | Run the lines below once for every item in the list. |
 | `repeat` | `repeat NUMBER times` | Run the lines below that many times. |
 | `repeat … until` | `repeat 100 times until done` | The same, but stop as soon as the condition is yes. The number is the ceiling, so a page always finishes. |
-| `include` | `include "file.html"` | Insert another page here. It can contain Common and sees your variables. |
+| `include` | `include "file.html"` | Insert another page here. It can contain Common and sees your variables. The name is next to the page, like `"parts/menu.html"`; a name starting with `/` starts from the site's top folder, like `"/header.html"`, so pages in subfolders share one header. `..` is never allowed. |
 | `send email` | `send email to "you@site.com"`, then `subject:`, `body:`, `reply to:`, `from:` lines, then `end` | Send an email to an address you wrote yourself. See [Email](#email). |
 
 ---

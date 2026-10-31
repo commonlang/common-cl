@@ -3,6 +3,8 @@
 set -e
 cd "$(dirname "$0")/.."
 fail() { echo "FAIL: $1"; exit 1; }
+# Wait until a test server answers (sanitizer builds start slowly), up to 10 seconds
+wait_for() { i=0; until curl -s -o /dev/null "http://127.0.0.1:$1/" || [ $i -ge 100 ]; do sleep 0.1; i=$((i + 1)); done; }
 has_db=; ./cl words | grep -q 'ask database' && has_db=yes   # database tests only when this build has SQLite
 
 # 1. The hello page
@@ -80,7 +82,7 @@ printf '<cl>set a to 1, 2\nset b to 1, 2\nif a is b\n  show "same"\nend\nif a is
 printf '<cl>include query "p"</cl>' > $t/_t.html
 ./cl $t/_t.html "p=../../../../../../../../etc/passwd" | grep -q "cannot take a name that came from a visitor" || fail "include refuses a visitor's file name"
 printf '<cl>include "../header.html"</cl>' > $t/_t.html
-./cl $t/_t.html | grep -q "not a path with .." || fail "include refuses .."
+./cl $t/_t.html | grep -q "never a path with .." || fail "include refuses .."
 if [ -n "$has_db" ]; then
   printf '<cl>open database "site.db"\nset n to query "n"\nset r to ask database "select * from posts where slug = %s[n]%s"</cl>' "'" "'" > $t/_t.html
   ./cl $t/_t.html "n=x' or '1'='1" | grep -q "Put the value after 'with' and write ? in its place" || fail "ask refuses SQL with a visitor's value inside"
@@ -163,7 +165,7 @@ rm -rf $t
 # 3d2. Sessions: remember / remembered / forget through the server, with a cookie jar
 port=$((21000 + $$ % 10000)); t=$(mktemp -d); jar=$t/jar
 printf '<cl>\nif form "name" is not empty\n  remember "user" as form "name"\n  go to "/"\nend\nif query "bye" is "yes"\n  forget everything\n  go to "/"\nend\nshow "user=[remembered "user"]"\n</cl>' > $t/index.html
-(./cl serve $port $t >/dev/null 2>&1 &) ; sleep 0.5
+(./cl serve $port $t >/dev/null 2>&1 &) ; wait_for $port
 [ "$(curl -s -c $jar -b $jar http://localhost:$port/)" = "user=" ]                         || fail "session starts empty"
 curl -s -i -c $jar -b $jar -X POST -d 'name=Ada' http://localhost:$port/ | grep -q '^Set-Cookie: cl_session=' || fail "remember sets a cookie"
 [ "$(curl -s -c $jar -b $jar http://localhost:$port/)" = "user=Ada" ]                      || fail "remembered reads the cookie back"
@@ -179,7 +181,7 @@ pkill -f "cl serve $port" ; rm -rf $t
 # 3e. The server never serves database files, and waits for a write lock
 port=$((20000 + $$ % 10000)); t=$(mktemp -d)
 printf '<cl>show "page"</cl>' > $t/index.html; printf 'secret' > $t/site.db; printf 'secret' > $t/seed.sql; printf 'secret' > $t/data.sqlite
-(./cl serve $port $t >/dev/null 2>&1 &) ; sleep 0.5
+(./cl serve $port $t >/dev/null 2>&1 &) ; wait_for $port
 [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:$port/site.db)" = 403 ]      || fail "server must not serve .db files"
 [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:$port/seed.sql)" = 403 ]     || fail "server must not serve .sql files"
 [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:$port/data.sqlite)" = 403 ]  || fail "server must not serve .sqlite files"
@@ -318,7 +320,7 @@ grep -q '^To: owner@example.com$' $t/piped.txt                      || fail "ema
 printf '#!/bin/sh\nexit 1\n' > $t/bad-sendmail; chmod +x $t/bad-sendmail
 CL_MAIL=sendmail CL_SENDMAIL=$t/bad-sendmail ./cl $t/m.html 2>&1 | grep -q "did not take the email" || fail "email: a sendmail failure is an error"
 port=$((20000 + ($$ + 7) % 10000))
-(./cl serve $port $t >/dev/null 2>&1 &) ; sleep 0.5
+(./cl serve $port $t >/dev/null 2>&1 &) ; wait_for $port
 f=$(ls $t/outbox | head -1)
 [ "$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$port/outbox/$f")" = 403 ] || fail "server must not serve the outbox"
 [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:$port/mail.log)" = 403 ]   || fail "server must not serve mail.log"
@@ -381,7 +383,7 @@ printf '<cl>\nset r to record\n  x: 1\nend\nshow id of r\n</cl>\n' > $t/f5.html
 # 3m. A form sent from another site is refused; every response says nosniff and no foreign frames
 printf '<cl>\nshow "got [form "a"]"\n</cl>\n' > $t/index.html
 port=$((20000 + ($$ + 13) % 10000))
-(./cl serve $port $t >/dev/null 2>&1 &) ; sleep 0.5
+(./cl serve $port $t >/dev/null 2>&1 &) ; wait_for $port
 u=http://127.0.0.1:$port/
 [ "$(curl -s -d a=1 $u)" = "got 1" ]                                || fail "a POST with no Origin still works"
 [ "$(curl -s -d a=1 -H "Origin: http://127.0.0.1:$port" $u)" = "got 1" ] || fail "a POST from the same site works"
@@ -483,7 +485,7 @@ SCRIPT_FILENAME=$t/r.html HTTPS=on ./cl cgi | grep -q 'SameSite=Lax; Secure' || 
 SCRIPT_FILENAME=$t/r.html ./cl cgi | grep -q 'Secure'                && fail "cookies are not marked Secure over plain HTTP"
 printf '<cl>remember "big" as form "v"\nshow "ok"</cl>' > $t/index.html
 port=$((20000 + ($$ + 21) % 10000))
-(./cl serve $port $t >/dev/null 2>&1 &) ; sleep 0.5
+(./cl serve $port $t >/dev/null 2>&1 &) ; wait_for $port
 big=$(python3 -I -c "print('x' * 6000)")
 [ "$(curl -s -o /dev/null -w '%{http_code}' -d "v=$big" http://127.0.0.1:$port/)" = 500 ] || fail "a response header too big for the buffer is a 500, not a memory leak"
 pkill -f "cl serve $port"
@@ -518,6 +520,21 @@ if [ -n "$has_db" ]; then
   [ "$(login right 5.6.7.8 p=right)" = "in" ]                                || fail "another address can still sign in"
   [ "$(wc -l < $t/login.log | tr -d ' ')" = 10 ]                             || fail "only wrong passwords are counted"
 fi
+rm -rf $t
+
+# 3r. include "/x.html" starts from the site's top folder, so pages in subfolders can share one header
+t=$(mktemp -d); mkdir -p $t/shop/deep
+printf '<cl>set where to "top"</cl>' > $t/header.html
+printf '<cl>include "/header.html"\nshow "[where]"</cl>' > $t/shop/index.html
+printf '<cl>include "/header.html"\nshow "deep [where]"</cl>' > $t/shop/deep/p.html
+[ "$(cd $t && "$OLDPWD/cl" shop/index.html)" = "top" ]               || fail "from the command line, / is the folder cl runs in"
+[ "$(SCRIPT_FILENAME=$t/shop/index.html DOCUMENT_ROOT=$t CL_PRIVATE_DIR=$t ./cl cgi | tail -1)" = "top" ] || fail "under cgi, / is the web root"
+port=$((20000 + ($$ + 33) % 10000))
+(./cl serve $port $t >/dev/null 2>&1 &) ; wait_for $port
+[ "$(curl -s http://127.0.0.1:$port/shop/deep/p)" = "deep top" ]    || fail "under cl serve, / is the folder being served, from any depth"
+pkill -f "cl serve $port"
+printf '<cl>include "/../x.html"</cl>' > $t/shop/b.html
+./cl $t/shop/b.html | grep -q "never a path with .."                || fail "include refuses .. after a leading / too"
 rm -rf $t
 
 # 4. Error messages

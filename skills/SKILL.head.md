@@ -135,8 +135,10 @@ show "[slug_of "Hello World"]"       # a verb that gives is used as a value
   value="yes">`, and test `if form "sent" is "yes"`.
 - Handle a form at the top of the page, before any HTML: read, check, act, then
   `go to` a thanks address so a refresh does not submit again.
-- `include "header.html"` runs another file in place. Included files share the
-  page's names and verbs. The usual layout: each page sets `title`, then
+- `include "header.html"` runs another file in place, next to the page;
+  `include "/header.html"` starts from the site's top folder, so a page in
+  `shop/` can use the same header (`..` is never allowed). Included files share
+  the page's names and verbs. The usual layout: each page sets `title`, then
   includes a header (which includes a settings file), then its content, then
   includes a footer. See `examples/site/`.
 - A `404.html` in the folder is shown for any missing address.

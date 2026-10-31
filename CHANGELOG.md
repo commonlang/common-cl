@@ -4,6 +4,7 @@ Changes go under **Unreleased** as they are made. `make release VERSION=X.Y.Z` t
 
 ## Unreleased
 
+- New: `include "/header.html"` starts from the site's top folder (the folder `cl serve` serves, the web root under `cl cgi`, or the folder you run `cl` from), so pages in subfolders can share one header instead of copying it. `..` is still refused.
 Security fixes from an outside review. Every site should update.
 
 - Fixed: a stray control byte (`\x01`) inside a text in practice code (`try`) crashed `cl`, on the practice, quest and share pages. It is now an error.

@@ -196,7 +196,7 @@ static const Word DICTIONARY[] = {
     { "end", "end", "close an if, for each, repeat, to, send email, record or text block", "repeat 3 times\n  show \"hip\"\nend", 1 },
     { "for", "for each NAME in LIST", "run the lines below once for every item", "for each fruit in fruits\n  show \"<li>[fruit]</li>\"\nend", 1 },
     { "repeat", "repeat NUMBER times [until CONDITION]", "run the lines below that many times, or fewer with 'until CONDITION': stop as soon as it is yes", "repeat 5 times\n  show \"★\"\nend", 1 },
-    { "include", "include \"file.html\"", "insert another page here", "include \"header.html\"", 1 },
+    { "include", "include \"file.html\"", "insert another page here. A name starting with / starts from the site's top folder: include \"/header.html\"", "include \"header.html\"", 1 },
     { "open", "open database \"file.db\"", "open a SQLite file next to the page, or a Postgres server with postgres://user:password@host/dbname", "open database \"site.db\"", 1 },
     { "tell", "tell database \"SQL\" with VALUE, ...", "run SQL that changes the database (insert, update, delete)", "tell database \"insert into notes (text) values (?)\" with note", 1 },
     { "go", "go to \"/page.html\"", "send the visitor to another page and stop", "go to \"/thanks\"", 1 },
@@ -863,7 +863,9 @@ static int g_mail_sent;      /* emails sent by this page run */
 
 /* The site secret signs session cookies. It lives in cl.secret in the site
    folder and is created on first use. */
-static char g_site_root[2048];
+static char g_site_root[2048];   /* the folder cl serve serves, or the web root under cl cgi */
+static char g_page_dir[2048];    /* the folder of the page being run: the top folder when there is no site root */
+static char g_include_root[2048]; /* where include "/x.html" starts, when it is not g_site_root */
 static char g_secret[129];
 /* Where cl.secret, mail.log and outbox/ live. Under cl cgi this is a folder
    outside the web root (see private_dir_for_cgi), so a missing or broken
@@ -2616,10 +2618,18 @@ static void exec_include(Env *e, Toks *T, Buf *out) {
     expect_line_end(T);
     if (v.t != V_TEXT) fail("'include' needs a file name in quotes");
     if (v.untrusted || v.tainted) fail("'include' cannot take a name that came from a visitor, who could then read any file. Write the file name yourself: include \"header.html\"");
-    if (strstr(v.s, "..") || v.s[0] == '/' || v.s[0] == '\\') fail("'include' names a file in the site folder, like \"header.html\" or \"parts/menu.html\", not a path with .. or a leading /");
+    if (strstr(v.s, "..") || strchr(v.s, '\\') || strchr(v.s, ':'))
+        fail("'include' names a file in the site, like \"header.html\", \"parts/menu.html\", or \"/header.html\" for the site's top folder, never a path with ..");
     if (e->include_depth > 10) fail("files include each other in a loop");
 
-    char path[4096]; snprintf(path, sizeof path, "%s/%s", e->dir, v.s);
+    /* "header.html" is next to this page; "/header.html" is in the site's top
+       folder, so a page in shop/ can use the same header as the home page. */
+    char path[4096];
+    if (v.s[0] == '/') {
+        const char *rest = v.s; while (*rest == '/') rest++;
+        if (!*rest) fail("'include \"/\"' needs a file name after the /, like \"/header.html\"");
+        snprintf(path, sizeof path, "%s/%s", g_site_root[0] ? g_site_root : g_include_root[0] ? g_include_root : g_page_dir, rest);
+    } else snprintf(path, sizeof path, "%s/%s", e->dir, v.s);
     FILE *f = fopen(path, "rb");
     if (!f) fail("cannot find the file \"%s\"", v.s);
     Buf *src = buf_new(); char chunk[4096]; size_t n;
@@ -3111,6 +3121,7 @@ static const char *mime_type(const char *path) {
 static void run_page(const char *file, const char *html, const char *query, const char *body,
                      const char *url_path, const char *cookie, const char *status, Response *r) {
     Env env; env_init(&env, file, query, body, url_path, cookie);
+    snprintf(g_page_dir, sizeof g_page_dir, "%s", env.dir);
     Buf *out = buf_new();
     cl_process_env(html, &env, out);
     char *sc = session_cookie(&env);
@@ -3439,6 +3450,8 @@ static int run_cgi(void) {
     g_https = (https && (!strcmp(https, "on") || !strcmp(https, "1"))) || (proto && !strcmp(proto, "https"));
     g_mail_live = 1;                   /* behind a real web server, emails really go out */
     private_dir_for_cgi();
+    const char *docroot = getenv("DOCUMENT_ROOT");
+    if (docroot && *docroot) snprintf(g_site_root, sizeof g_site_root, "%s", docroot);   /* include "/header.html" starts here */
     const char *ra = getenv("REMOTE_ADDR");
     snprintf(g_remote, sizeof g_remote, "%s", ra && *ra ? ra : "unknown");
     for (char *c = g_remote; *c; c++) if (isspace((unsigned char)*c)) *c = '_';
@@ -3549,6 +3562,15 @@ int main(int argc, char **argv) {
 
     char *html = read_file(argv[1], NULL);
     if (!html) { fprintf(stderr, "cl: cannot read %s\n", argv[1]); return 1; }
+#ifndef _WIN32
+    /* From the command line, include "/x.html" starts in the folder cl is run
+       from, as long as the page is inside it: cd mysite, then cl shop/index.html. */
+    {
+        char cwd[2048], real[4096];
+        if (getcwd(cwd, sizeof cwd) && realpath(argv[1], real) && !strncmp(real, cwd, strlen(cwd)) && real[strlen(cwd)] == '/')
+            snprintf(g_include_root, sizeof g_include_root, "%s", cwd);
+    }
+#endif
 
     Response r; memset(&r, 0, sizeof r);
     run_page(argv[1], html,
