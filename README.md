@@ -6,6 +6,12 @@ Code lives in HTML pages inside `<cl>` tags, and the server runs it before the
 page reaches the browser, the way PHP works. The browser never sees Common.
 
 ```html
+<cl>
+  set visitor to query "name"
+  if visitor is empty
+    set visitor to "friend"
+  end
+</cl>
 <h1>Hello, <cl>show visitor</cl>!</h1>
 
 <cl>
