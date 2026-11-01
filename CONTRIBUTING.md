@@ -55,6 +55,8 @@ By taking part you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
    make agents          # if you changed a word, its meaning or example
    ```
 
+   The tests also use `curl`, `python3`, `pkill` and, when `cl` has SQLite, the `sqlite3` command. macOS has them all. Debian/Ubuntu: `apt install curl python3 procps sqlite3`.
+
 3. Follow the rules above: a dictionary entry, docs, the VS Code grammar and
    a test for every new word or error.
 4. Open the pull request, fill in the template, and explain why the change

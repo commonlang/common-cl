@@ -5,7 +5,12 @@ cd "$(dirname "$0")/.."
 fail() { echo "FAIL: $1"; exit 1; }
 # Wait until a test server answers (sanitizer builds start slowly), up to 10 seconds
 wait_for() { i=0; until curl -s -o /dev/null "http://127.0.0.1:$1/" || [ $i -ge 100 ]; do sleep 0.1; i=$((i + 1)); done; }
+# Besides cl, the tests use a few commands. Say up front which one is missing, instead of
+# stopping half-way with only "not found". macOS has them all; a bare Linux box may not.
+need() { command -v "$1" >/dev/null 2>&1 || fail "the tests need the '$1' command. Debian/Ubuntu: apt install $2"; }
+need curl curl; need python3 python3; need pkill procps
 has_db=; ./cl words | grep -q 'ask database' && has_db=yes   # database tests only when this build has SQLite
+[ -z "$has_db" ] || need sqlite3 sqlite3   # this cl has SQLite, so its database tests need the sqlite3 command too
 
 # 1. The hello page
 out=$(./cl tests/hello.html)

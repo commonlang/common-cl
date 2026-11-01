@@ -151,6 +151,8 @@ make test        # the test suite
 make sanitize    # the same suite under AddressSanitizer and UBSan (clang or gcc)
 ```
 
+The tests also use `curl`, `python3`, `pkill` and, when `cl` has SQLite, the `sqlite3` command. macOS has them all. Debian/Ubuntu: `apt install curl python3 procps sqlite3`.
+
 ---
 
 ## Uninstalling
