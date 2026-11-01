@@ -20,6 +20,7 @@ Security fixes from an outside review. Every site should update.
 - Fixed: more hostile practice code that crashed `cl`: `set 5 to` (a block with a number for a name), a long chain like `count of count of ...`, and thousands of nested blocks. Blocks now nest at most 500 deep.
 - New: after 10 wrong passwords from one address within 10 minutes, `matches` refuses that address until the 10 minutes are up. Each check is slow on purpose, so this also stops one visitor from using the server's time for guessing.
 - Changed: under `cl cgi`, `cl.secret`, `mail.log`, `login.log` and the outbox live outside the web root, in `<the folder above it>/.common/<its name>/` (for example `~/.common/public_html/`), readable only by you, so they no longer depend on `.htaccess` rules. `CL_PRIVATE_DIR` chooses another folder. Existing sign-ins end once, because a new `cl.secret` is made there.
+- Fixed: `make` failed on Linux with gcc 14 (`implicit declaration of function 'realpath'`). glibc hides `realpath` under the strict POSIX setting the source asked for, and gcc 14 treats an undeclared function as an error where older versions only warned. The source now also asks for `_DEFAULT_SOURCE`. macOS and Windows were not affected.
 
 ## 0.4.0 (2026-10-29)
 

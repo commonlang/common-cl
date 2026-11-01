@@ -38,6 +38,7 @@
 #define CL_VERSION "0.4.0"
 #define _POSIX_C_SOURCE 200809L
 #define _DARWIN_C_SOURCE
+#define _DEFAULT_SOURCE             /* glibc: realpath; gcc 14 refuses implicit declarations */
 #define _CRT_RAND_S                 /* Windows: rand_s, the system's secure random numbers */
 #include <stdio.h>
 #include <stdlib.h>
