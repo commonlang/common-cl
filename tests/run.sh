@@ -501,7 +501,8 @@ t=$(mktemp -d)
 printf '<cl>show try form "code"</cl>' > $t/s.html
 ./cl $t/s.html "" "code=set+5+to%0Aend" | grep -q 'expected a name'           || fail "set 5 to (a text block with a number for a name) is an error, not a crash"
 ./cl $t/s.html "" "code=set+5+to+record%0Aend" | grep -q 'expected a name'    || fail "set 5 to record is an error, not a crash"
-deep=$(python3 -I -c "import urllib.parse; print(urllib.parse.quote_plus('show ' + 'count of '*20000 + '\"x\"'))")
+# 5000 deep is far past the limit of 200 and keeps this one argument under 128 KB, the most Linux allows
+deep=$(python3 -I -c "import urllib.parse; print(urllib.parse.quote_plus('show ' + 'count of '*5000 + '\"x\"'))")
 ./cl $t/s.html "" "code=$deep" | grep -q 'nests too deeply'                  || fail "a long chain of count of is an error, not a crash"
 python3 -I -c "print('<cl>\n' + 'if yes\n'*20000 + 'show 1\n' + 'end\n'*20000 + '</cl>')" > $t/d.html
 ./cl $t/d.html | grep -q 'nested too deeply'                                 || fail "20000 nested ifs are an error, not a crash"
