@@ -220,6 +220,9 @@ automated yet; until a release workflow exists, say so in the release pull reque
   build described in `docs/deploy.md` needs rebuilding.
 - **Compilers:** new warnings from a newer gcc or clang are bugs to fix,
   not flags to turn off.
+- **Housekeeping:** the checklist at the end of [AGENTS.md](AGENTS.md) (a
+  Linux test run, examples that run as pasted, a complete changelog, releases
+  that do not lag, branch cleanup) is part of every change.
 
 ## Triage
 

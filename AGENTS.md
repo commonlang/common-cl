@@ -48,3 +48,32 @@ make release VERSION=X.Y.Z  # prepare a release; see MAINTAINING.md. Never tags 
   `go to` off the site, or email recipients. Keep that true for new words.
 - Only optional libraries, detected by the Makefile. Plain C11 otherwise.
 - Write for readers new to programming: plain words, short sentences.
+
+## Housekeeping
+
+Small chores that keep the repository honest. Do them as part of every change,
+and go over the list whenever you finish a piece of work.
+
+- **Test on Linux too.** macOS hides Linux-only failures: a newer gcc refuses
+  what clang allows, Linux caps one command-line argument at 128 KB, Debian does
+  not ship the `sqlite3` command with the library, and gcc's sanitizer uses far
+  more stack per call. Any change to `src/cl.c`, `tests/` or the `Makefile` is
+  also built and tested in a Linux container with a current gcc (14 or newer),
+  including `make sanitize` with `ASAN_OPTIONS=detect_leaks=1`. CONTRIBUTING.md
+  ("Checking for leaks") shows the Docker command; `debian:trixie-slim` with
+  `apt install gcc make libsqlite3-dev sqlite3 curl python3 procps` works too.
+- **Examples run as pasted.** Every code block in `README.md`, `docs/` and
+  `skills/SKILL.head.md` must work when copied into a page on its own. When you
+  touch one, run it through `./cl`. The tests already run the skill's blocks.
+- **The changelog is complete.** Every user-visible change that merged has a
+  line under `## Unreleased`. Check this after each merge, not only your own.
+- **Releases do not lag.** `## Unreleased` is not a place to store finished
+  work. Once it holds a security fix, release at once; otherwise release when
+  something has waited there more than two weeks. Fixes only make a patch
+  release, which an agent may prepare with `make release` and tag once merged.
+  A new word or a behavior change makes a minor release, which a person
+  decides: open an issue that proposes the version and lists what is waiting.
+  Every version in `CHANGELOG.md` should have a `vX.Y.Z` tag and a GitHub
+  release with the changelog section as its notes; if one is missing, say so.
+- **Branches.** Delete your own branch once its pull request has merged. Never
+  delete anyone else's.
