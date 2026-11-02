@@ -4,6 +4,8 @@ Changes go under **Unreleased** as they are made. `make release VERSION=X.Y.Z` t
 
 ## Unreleased
 
+## 0.5.0 (2026-11-01)
+
 - New: `include "/header.html"` starts from the site's top folder (the folder `cl serve` serves, the web root under `cl cgi`, or the folder you run `cl` from), so pages in subfolders can share one header instead of copying it. `..` is still refused.
 Security fixes from an outside review. Every site should update.
 
