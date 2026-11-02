@@ -23,6 +23,7 @@ Security fixes from an outside review. Every site should update.
 - Fixed: `make` failed on Linux with gcc 14 (`implicit declaration of function 'realpath'`). glibc hides `realpath` under the strict POSIX setting the source asked for, and gcc 14 treats an undeclared function as an error where older versions only warned. The source now also asks for `_DEFAULT_SOURCE`. macOS and Windows were not affected.
 - Fixed: on Linux without the `sqlite3` command, `make test` stopped half-way with only `sqlite3: not found`, although `cl` itself worked. The tests now say up front which commands they need and how to install them.
 - Fixed: `make test` failed on Linux at "a long chain of count of": the test put a 180 KB argument on the command line, and Linux allows at most 128 KB in one argument, so `cl` never ran. The chain is now 5,000 deep, still far past the limit of 200.
+- Fixed: a page with hundreds of blocks or brackets inside each other could crash `cl` on a computer that gives programs a small stack: Windows, some shared hosts, and the sanitizer build on Linux. Each nested block used about 11 KB of stack because the compiler folded the email, include and database helpers into the block runner; it now uses about 1 KB. `cl` also watches how much stack the page uses and stops it with "nested too deeply" before the stack runs out, whatever the computer's limit.
 
 ## 0.4.0 (2026-10-29)
 

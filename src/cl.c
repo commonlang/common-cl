@@ -84,12 +84,22 @@
 #  include <sys/socket.h>
 #  include <netinet/in.h>
 #  include <arpa/inet.h>
+#  include <sys/resource.h>      /* getrlimit: how much C stack a page may use, see stack_check */
    typedef int sock_t;
 #  define sock_close(s)        close(s)
 #  define sock_read(s, b, n)   read((s), (b), (n))
 #  define sock_write(s, b, n)  write((s), (b), (n))
 #  define sock_valid(s)        ((s) >= 0)
 #  define sock_opt_ptr(p)      (p)
+#endif
+/* Helpers with big buffers that the block runner calls once. If the compiler folded
+   them into exec_lines_inner, every nested block would pay for their stack space. */
+#if defined(__GNUC__) || defined(__clang__)
+#  define NOINLINE __attribute__((noinline))
+#elif defined(_MSC_VER)
+#  define NOINLINE __declspec(noinline)
+#else
+#  define NOINLINE
 #endif
 
 /* Practice code from 'try' gets a memory budget; every allocation of text and
@@ -1238,7 +1248,7 @@ static char *plain_text(const Value *v) {
 
 static int is_pg_address(const char *s) { return !strncmp(s, "postgres://", 11) || !strncmp(s, "postgresql://", 13); }
 
-static void db_open(Env *e, const char *file) {
+static NOINLINE void db_open(Env *e, const char *file) {
     if (e->root && e->root != e) e = e->root;
     if (is_pg_address(file)) {
 #ifdef CL_POSTGRES
@@ -1425,12 +1435,44 @@ static void db_tell(Env *e, const char *sql, Value *params) {
 }
 
 static Value parse_expr(Env *e, Toks *T);
+/* How much C stack the page may use. Blocks, brackets and verbs inside each other
+   each take a frame; the counts below cap them, but a frame's size depends on the
+   compiler and the stack on the computer (8 MB on Linux and macOS, 1 MB on Windows,
+   less on some hosts), so the page is also stopped before the stack itself runs out. */
+static uintptr_t g_stack_base;        /* where the stack began, recorded as main() starts */
+static size_t g_stack_budget;         /* how far below it the page may go */
+/* Where the C stack is right now: the frame itself, which is the real stack even when
+   a sanitizer keeps copies of local variables elsewhere, so &local would mislead. */
+static uintptr_t stack_here(void) {
+#if defined(__GNUC__) || defined(__clang__)
+    return (uintptr_t)__builtin_frame_address(0);
+#else
+    char here; return (uintptr_t)&here;
+#endif
+}
+static void stack_setup(void) {
+    size_t limit = (size_t)1 << 20;                            /* Windows: 1 MB unless the linker was told otherwise */
+#ifndef _WIN32
+    struct rlimit rl;
+    limit = (size_t)8 << 20;
+    if (getrlimit(RLIMIT_STACK, &rl) == 0 && rl.rlim_cur != RLIM_INFINITY && (size_t)rl.rlim_cur < limit) limit = (size_t)rl.rlim_cur;
+#endif
+    g_stack_base = stack_here();
+    g_stack_budget = limit - limit / 4;                       /* a quarter is kept for the deepest leaf calls: SQLite, email, files */
+}
+static void stack_check(void) {
+    uintptr_t now = stack_here();                              /* the stack grows down on every supported machine */
+    if (g_stack_base && now < g_stack_base && g_stack_base - now > g_stack_budget)
+        fail("the page is nested too deeply for this computer: too many blocks, brackets or verbs inside each other. Make it flatter");
+}
+
 /* How deeply expressions are nested right now: brackets, holes, 'not', '-'.
    Each level is a C stack frame, so a limit keeps a hostile line from crashing. */
 static int g_expr_depth;
 #define MAX_EXPR_DEPTH 200
 static void expr_enter(void) {
     if (++g_expr_depth > MAX_EXPR_DEPTH) { g_expr_depth = 0; fail("the line nests too deeply (more than %d brackets, holes or 'not's inside each other)", MAX_EXPR_DEPTH); }
+    if (g_expr_depth > 8) stack_check();                       /* deep brackets: watch the stack itself too */
 }
 static Value parse_add(Env *e, Toks *T);
 
@@ -1581,7 +1623,7 @@ static void rest_of_line(Env *e, int skip, char *out, size_t n) { rest_of_line_x
 
 /* Before a line is even tokenized: if show / set ... to / print is followed by
    plain words, the writer probably forgot the quotes. Say so, with the fixed line. */
-static void forgive_unquoted(Env *e) {
+static NOINLINE void forgive_unquoted(Env *e) {
     const char *p = e->line_text, *end = p + e->line_len;
     while (p < end && isspace((unsigned char)*p)) p++;
     const char *w = p; while (p < end && (isalnum((unsigned char)*p) || *p == '_')) p++;
@@ -2478,7 +2520,7 @@ static int mail_recent(const char *log, time_t now) {
     fclose(f); return n;
 }
 
-static void send_email(Env *e, const Value *to_v, const Value *r) {
+static NOINLINE void send_email(Env *e, const Value *to_v, const Value *r) {
     if (e->sandbox) fail("'send' is not allowed in practice code. Everything else is");
     const char *to = fixed_address(to_v, "send email to", "you@yoursite.com");
 
@@ -2613,7 +2655,7 @@ static void exec_add(Env *e, Toks *T) {
     held_pop();                                     /* the list owns it now */
 }
 
-static void exec_include(Env *e, Toks *T, Buf *out) {
+static NOINLINE void exec_include(Env *e, Toks *T, Buf *out) {
     Value v = parse_expr(e, T);
     held_push(v);
     expect_line_end(T);
@@ -2690,6 +2732,7 @@ static void exec_lines_inner(Env *e, Lines *L, int from, int to, Buf *out);
 static int g_block_depth;
 #define MAX_BLOCK_DEPTH 500
 static void exec_lines(Env *e, Lines *L, int from, int to, Buf *out) {
+    stack_check();
     if (++g_block_depth > MAX_BLOCK_DEPTH) { g_block_depth = 0; fail("blocks are nested too deeply (more than %d inside each other)", MAX_BLOCK_DEPTH); }
     exec_lines_inner(e, L, from, to, out);
     g_block_depth--;
@@ -3540,6 +3583,7 @@ static void usage(void) {
 }
 
 int main(int argc, char **argv) {
+    stack_setup();                                           /* see stack_check */
     if (argc < 2) usage();
 
     if (strcmp(argv[1], "words") == 0) {

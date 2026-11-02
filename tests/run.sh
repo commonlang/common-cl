@@ -506,6 +506,9 @@ deep=$(python3 -I -c "import urllib.parse; print(urllib.parse.quote_plus('show '
 ./cl $t/s.html "" "code=$deep" | grep -q 'nests too deeply'                  || fail "a long chain of count of is an error, not a crash"
 python3 -I -c "print('<cl>\n' + 'if yes\n'*20000 + 'show 1\n' + 'end\n'*20000 + '</cl>')" > $t/d.html
 ./cl $t/d.html | grep -q 'nested too deeply'                                 || fail "20000 nested ifs are an error, not a crash"
+# The same with the small stack some hosts give: still an error, never a crash (see stack_check in cl.c)
+(ulimit -s 1024; ./cl $t/d.html) | grep -q 'nested too deeply'                 || fail "with a 1 MB stack, 20000 nested ifs are still an error, not a crash"
+(ulimit -s 1024; ./cl $t/s.html "" "code=$deep") | grep -q 'too deeply'        || fail "with a 1 MB stack, a long chain of count of is still an error, not a crash"
 printf '<cl>\nto countdown n\n  if n is more than 0\n    countdown n - 1\n  end\nend\ncountdown 99\nshow "deep ok"\n</cl>\n' > $t/r.html
 ./cl $t/r.html | grep -q '^deep ok'                                          || fail "a verb may still call itself 99 deep with an if inside"
 mkdir -p $t/home/public_html; d=$t/home/public_html
